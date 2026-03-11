@@ -1,17 +1,17 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  --bg: #FAFAF8; --surface: #FFF;
-  --ink: #111; --ink2: #3A3A3A; --ink3: #6E6E6E; --ink4: #A0A0A0; --ink5: #D0CEC8;
-  --border: #E6E4DF; --recessed: #F3F2EF;
+  --bg: #FFFFFF; --surface: #FFFFFF;
+  --ink: #0D0D0D; --ink2: #2A2A2A; --ink3: #5C5C5C; --ink4: #999; --ink5: #D4D4D4;
+  --border: #E5E5E5; --recessed: #F5F5F5;
   --green: #1A7F37; --green-bg: #ECFDF3;
   --red: #CF222E; --red-bg: #FFF0F0;
-  --blue: #0550AE; --blue-bg: #EFF6FF;
+  --blue: #2563EB; --blue-bg: #EFF6FF;
   --gold: #9A6700; --gold-bg: #FFF8E1;
+  --accent: #2563EB;
   --mono: 'IBM Plex Mono', monospace;
-  --sans: 'DM Sans', system-ui, sans-serif;
-  --display: 'DM Serif Display', Georgia, serif;
-  --max: 740px; --m: clamp(20px, 5vw, 48px);
+  --sans: 'Inter Tight', system-ui, sans-serif;
+  --max: 820px; --m: clamp(24px, 5vw, 56px);
 }
 
 html, body {
@@ -26,3 +26,4 @@ html, body {
 
 @keyframes spin { to { transform: rotate(360deg); } }
 @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
