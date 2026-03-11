@@ -75,37 +75,15 @@ async function enrich(existing, text, label) {
   return r;
 }
 
-// ─── Brand Mockup Generators ────────────────────────────────────────────────
+// ─── Brand Image Fetching ───────────────────────────────────────────────────
 
-function esc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
-
-function mockupBusinessCard(brand) {
-  const c = brand.colors?.[0]?.hex || "#111";
-  const c2 = brand.colors?.[1]?.hex || "#FFF";
-  const name = esc(brand.name);
-  const tag = esc(brand.tagline || "");
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="192"><rect width="320" height="192" rx="8" fill="${c}"/><rect x="20" y="20" width="40" height="40" rx="8" fill="${c2}" opacity=".2"/><text x="40" y="47" text-anchor="middle" font-family="system-ui" font-size="18" font-weight="bold" fill="${c2}">${esc(name.charAt(0))}</text><text x="20" y="100" font-family="system-ui" font-size="16" font-weight="600" fill="#FFF">${name}</text><text x="20" y="120" font-family="system-ui" font-size="10" fill="#FFF" opacity=".7">${tag.length > 45 ? tag.slice(0, 45) + "…" : tag}</text><rect x="20" y="148" width="60" height="1" fill="#FFF" opacity=".3"/><text x="20" y="168" font-family="monospace" font-size="9" fill="#FFF" opacity=".5">${esc(brand.domain || "")}</text></svg>`)}`;
-}
-
-function mockupSocialPost(brand) {
-  const c = brand.colors?.[0]?.hex || "#111";
-  const c2 = brand.colors?.[2]?.hex || brand.colors?.[1]?.hex || "#F5F5F5";
-  const name = esc(brand.name);
-  const prop = esc(brand.messaging?.proposition || brand.tagline || "");
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320"><rect width="320" height="320" rx="8" fill="${c2}"/><rect y="0" width="320" height="6" fill="${c}"/><text x="24" y="44" font-family="system-ui" font-size="11" font-weight="600" fill="${c}">${name}</text><rect x="24" y="64" width="272" height="180" rx="6" fill="${c}"/><text x="160" y="140" text-anchor="middle" font-family="Georgia,serif" font-size="14" fill="#FFF" font-style="italic"><tspan x="160" dy="0">${prop.length > 40 ? prop.slice(0, 40) : prop}</tspan><tspan x="160" dy="18">${prop.length > 40 ? (prop.slice(40, 80) + (prop.length > 80 ? "…" : "")) : ""}</tspan></text><rect x="24" y="264" width="80" height="28" rx="14" fill="${c}" opacity=".15"/><text x="64" y="282" text-anchor="middle" font-family="system-ui" font-size="10" fill="${c}">Learn more</text></svg>`)}`;
-}
-
-function mockupLetterhead(brand) {
-  const c = brand.colors?.[0]?.hex || "#111";
-  const name = esc(brand.name);
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="310"><rect width="240" height="310" rx="4" fill="#FFF" stroke="#E6E4DF"/><rect width="240" height="48" fill="${c}"/><text x="20" y="31" font-family="system-ui" font-size="14" font-weight="600" fill="#FFF">${name}</text><rect x="20" y="68" width="160" height="4" rx="2" fill="#E6E4DF"/><rect x="20" y="82" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="94" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="106" width="180" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="118" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="130" width="140" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="150" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="162" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="174" width="160" height="3" rx="1.5" fill="#F3F2EF"/><rect x="0" y="290" width="240" height="20" fill="${c}" opacity=".08"/><text x="120" y="304" text-anchor="middle" font-family="monospace" font-size="7" fill="${c}" opacity=".5">${esc(brand.domain || "")}</text></svg>`)}`;
-}
-
-function mockupAppIcon(brand) {
-  const c = brand.colors?.[0]?.hex || "#111";
-  const c2 = brand.colors?.[1]?.hex || "#FFF";
-  const initial = esc((brand.name || "B").charAt(0));
-  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" rx="36" fill="${c}"/><text x="80" y="105" text-anchor="middle" font-family="Georgia,serif" font-size="72" font-weight="400" fill="${c2}">${initial}</text></svg>`)}`;
+async function fetchBrandImages(domain) {
+  if (!domain) return [];
+  try {
+    const r = await fetch(`/api/brand-images?domain=${encodeURIComponent(domain)}`);
+    const d = await r.json();
+    return d.images || [];
+  } catch { return []; }
 }
 
 function placeholderSvg(label, w = 240, h = 160) {
@@ -152,7 +130,7 @@ function SourcePill({ label }) {
 
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
-function Profile({ brand, sources, images }) {
+function Profile({ brand, sources, images, brandImages }) {
   const colors = Array.isArray(brand.colors) ? brand.colors : [...(brand.colors?.primary || []), ...(brand.colors?.secondary || [])];
   const cn = brand.confidence || {};
 
@@ -161,7 +139,7 @@ function Profile({ brand, sources, images }) {
     <div style={{ marginBottom: 40 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          {brand.domain && <img src={`https://logo.clearbit.com/${brand.domain}`} alt="" style={{ width: 48, height: 48, borderRadius: 8, border: "1px solid #E6E4DF", objectFit: "contain", background: "#FFF" }} onError={e => { e.target.style.display = "none"; }} />}
+          {brand.domain && <img src={`https://www.google.com/s2/favicons?domain=${brand.domain}&sz=128`} alt="" style={{ width: 48, height: 48, borderRadius: 8, border: "1px solid #E6E4DF", objectFit: "contain", background: "#FFF" }} onError={e => { e.target.style.display = "none"; }} />}
           <h1 style={{ fontFamily: DF, fontSize: "clamp(36px,6vw,56px)", fontWeight: 400, letterSpacing: "-.02em", lineHeight: .95 }}>{brand.name}</h1>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingTop: 8 }}>{sources.map((s, i) => <SourcePill key={i} label={s} />)}</div>
@@ -277,27 +255,15 @@ function Profile({ brand, sources, images }) {
       </div>}
     </div>}
 
-    {/* Brand Applications */}
-    <div style={{ marginBottom: 48 }}><Sec num={6} label="Brand Applications" />
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-        <div>
-          <img src={mockupBusinessCard(brand)} style={{ width: "100%", borderRadius: 8, border: "1px solid #E6E4DF" }} />
-          <div style={{ ...M, fontSize: 10, color: "#A0A0A0", marginTop: 6 }}>Business Card</div>
-        </div>
-        <div>
-          <img src={mockupAppIcon(brand)} style={{ width: 96, height: 96, borderRadius: 22, border: "1px solid #E6E4DF" }} />
-          <div style={{ ...M, fontSize: 10, color: "#A0A0A0", marginTop: 6 }}>App Icon</div>
-        </div>
-        <div>
-          <img src={mockupSocialPost(brand)} style={{ width: "100%", borderRadius: 8, border: "1px solid #E6E4DF" }} />
-          <div style={{ ...M, fontSize: 10, color: "#A0A0A0", marginTop: 6 }}>Social Post</div>
-        </div>
-        <div>
-          <img src={mockupLetterhead(brand)} style={{ width: "100%", borderRadius: 8, border: "1px solid #E6E4DF" }} />
-          <div style={{ ...M, fontSize: 10, color: "#A0A0A0", marginTop: 6 }}>Letterhead</div>
-        </div>
+    {/* Brand Imagery */}
+    {brandImages.length > 0 && <div style={{ marginBottom: 48 }}><Sec num={6} label="Brand Imagery" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        {brandImages.map((url, i) => <div key={i} style={{ borderRadius: 8, overflow: "hidden", border: "1px solid #E6E4DF", background: "#F3F2EF" }}>
+          <img src={url} alt="" style={{ width: "100%", height: 180, objectFit: "cover", display: "block" }} onError={e => { e.target.parentElement.style.display = "none"; }} />
+        </div>)}
       </div>
-    </div>
+      {brand.domain && <div style={{ ...M, fontSize: 10, color: "#D0CEC8", marginTop: 8 }}>Sourced from {brand.domain}</div>}
+    </div>}
 
     {/* Insights */}
     {brand.insights?.length > 0 && <div style={{ marginBottom: 48 }}><Sec label="Cross-source insights" />
@@ -320,6 +286,7 @@ export default function App() {
   const [brand, setBrand] = useState(null);
   const [sources, setSources] = useState([]);
   const [images, setImages] = useState([]);
+  const [brandImages, setBrandImages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState([]);
@@ -362,6 +329,8 @@ export default function App() {
         setSources(s);
         setSteps([]);
         scroll();
+        // Fetch real brand images in background
+        if (result.domain) fetchBrandImages(result.domain).then(setBrandImages);
       } catch (e) {
         clearTimers(); setError(e.message); setSteps([]);
       } finally { setLoading(false); }
@@ -392,7 +361,7 @@ export default function App() {
     }
   }
 
-  function reset() { clearTimers(); setBrand(null); setSources([]); setImages([]); setSteps([]); setError(null); setInput(""); setLoading(false); }
+  function reset() { clearTimers(); setBrand(null); setSources([]); setImages([]); setBrandImages([]); setSteps([]); setError(null); setInput(""); setLoading(false); }
   const canSend = (input.trim() || images.length > 0) && !loading;
 
   return <div style={{ minHeight: "100vh", background: "#FAFAF8", fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 15, color: "#111", lineHeight: 1.6 }}>
@@ -427,7 +396,7 @@ export default function App() {
       </div>)}</div>}
 
       {/* Profile */}
-      {brand && !loading && steps.length === 0 && <Profile brand={brand} sources={sources} images={images} />}
+      {brand && !loading && steps.length === 0 && <Profile brand={brand} sources={sources} images={images} brandImages={brandImages} />}
 
       {/* Error */}
       {error && <div style={{ padding: "12px 16px", background: "#FFF0F0", borderRadius: 6, marginBottom: 16, fontSize: 14, color: "#CF222E" }}>{error}</div>}
