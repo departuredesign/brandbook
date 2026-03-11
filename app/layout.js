@@ -1,7 +1,7 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "BrandBrain",
+  title: "BrandBook",
   description: "AI-powered brand intelligence — start with a name, build a living brand profile.",
 };
 

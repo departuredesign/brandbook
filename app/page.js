@@ -38,7 +38,7 @@ function tryParse(raw) {
   return null;
 }
 
-const SYS = "You are BrandBrain, an AI brand strategist. Return ONLY valid JSON. No markdown, no backticks, no preamble.";
+const SYS = "You are BrandBook, an AI brand strategist. Return ONLY valid JSON. No markdown, no backticks, no preamble.";
 const SCHEMA = `{"name":"","tagline":"","summary":"","personality":[],"colors":[{"name":"","hex":"","role":""}],"typography":{"primary":"","secondary":"","rules":[]},"voice":{"words":[],"do":[],"dont":[]},"messaging":{"proposition":"","pillars":[{"title":"","desc":""}],"forbidden":[]},"audience":"","competitive":{"positioning":"","competitors":[{"name":"","hex":"","tone":"","overlap":""}],"whitespace":"","threats":[]},"confidence":{"colors":0,"type":0,"voice":0,"messaging":0}}`;
 
 async function analyze(name) {
@@ -317,7 +317,7 @@ export default function App() {
       setSteps([
         { label: "Processing new input…", active: true, done: false },
         { label: "Comparing with profile", active: false, done: false },
-        { label: "Updating Brand Brain", active: false, done: false },
+        { label: "Updating Brand Book", active: false, done: false },
       ]);
       scroll();
       timerRef.current.push(setTimeout(() => adv(0), 1500));
@@ -347,7 +347,7 @@ export default function App() {
       <div style={{ maxWidth: 740, margin: "0 auto", padding: "0 clamp(20px,5vw,48px)", height: 52, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15, fontWeight: 500 }}>
           <svg width="20" height="20" viewBox="0 0 20 20"><rect width="20" height="20" rx="4" fill="#111"/><rect x="3.5" y="3.5" width="5" height="5" rx="1" fill="#FAFAF8"/><rect x="11.5" y="11.5" width="5" height="5" rx="1" fill="#FAFAF8"/></svg>
-          BrandBrain
+          BrandBook
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           {brand && <button onClick={reset} style={{ background: "none", border: "1px solid #E6E4DF", padding: "5px 14px", borderRadius: 6, fontSize: 12, color: "#6E6E6E", cursor: "pointer", fontFamily: "inherit" }}>New brand</button>}
@@ -361,7 +361,7 @@ export default function App() {
       {/* Empty state */}
       {!brand && !loading && steps.length === 0 && <div style={{ paddingTop: "16vh", paddingBottom: 48 }}>
         <h1 style={{ fontFamily: DF, fontSize: "clamp(32px,5vw,48px)", fontWeight: 400, lineHeight: 1.1, letterSpacing: "-.02em", marginBottom: 16 }}>Start with a name.</h1>
-        <p style={{ fontSize: 16, color: "#6E6E6E", lineHeight: 1.65, maxWidth: 440 }}>BrandBrain builds an intelligence profile from whatever you give it. A company name is enough to start. Add guidelines, images, or context to sharpen the picture.</p>
+        <p style={{ fontSize: 16, color: "#6E6E6E", lineHeight: 1.65, maxWidth: 440 }}>BrandBook builds an intelligence profile from whatever you give it. A company name is enough to start. Add guidelines, images, or context to sharpen the picture.</p>
       </div>}
 
       {/* Steps */}
