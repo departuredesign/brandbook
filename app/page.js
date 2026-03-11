@@ -1,13 +1,13 @@
 "use client";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 
 // ─── API ─────────────────────────────────────────────────────────────────────
 
-async function callClaude(messages, system) {
+async function callClaude(messages, system, maxTokens = 8192) {
   const r = await fetch("/api/claude", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: 4096, system, messages }),
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: maxTokens, system, messages }),
   });
   if (!r.ok) throw new Error("API " + r.status);
   const d = await r.json();
@@ -37,12 +37,12 @@ function tryParse(raw) {
 }
 
 const SYS = "You are BrandBook, an AI brand strategist. Return ONLY valid JSON. No markdown, no backticks, no preamble.";
-const SCHEMA = `{"name":"","domain":"","tagline":"","summary":"","personality":[],"colors":[{"name":"","hex":"","role":""}],"typography":{"primary":"","secondary":"","rules":[]},"voice":{"words":[],"do":[],"dont":[]},"messaging":{"proposition":"","pillars":[{"title":"","desc":""}],"forbidden":[]},"audience":"","competitive":{"positioning":"","competitors":[{"name":"","hex":"","tone":"","overlap":""}],"whitespace":"","threats":[]},"confidence":{"colors":0,"type":0,"voice":0,"messaging":0}}`;
+const SCHEMA = `{"name":"","domain":"","tagline":"","summary":"","personality":[],"colors":[{"name":"","hex":"","role":""}],"typography":{"primary":"","secondary":"","rules":[]},"voice":{"words":[],"do":[],"dont":[]},"messaging":{"proposition":"","pillars":[{"title":"","desc":""}],"forbidden":[]},"audience":"","competitive":{"positioning":"","competitors":[{"name":"","hex":"","tone":"","overlap":""}],"whitespace":"","threats":[]},"logo":{"description":"","orientations":[],"clearSpace":"","minSize":"","backgrounds":{"approved":[],"forbidden":[]},"forbidden":[]},"photography":{"mood":"","subjects":[],"styling":"","do":[],"dont":[],"colorTreatment":""},"naming":{"conventions":[],"capitalization":"","productNames":[{"name":"","type":""}]},"channels":{"social":"","email":"","advertising":"","web":"","print":""},"promotion":{"do":[],"dont":[],"formatting":""},"brand_principles":{"mission":"","vision":"","values":[],"archetypes":[]},"confidence":{"colors":0,"type":0,"voice":0,"messaging":0,"logo":0,"photography":0,"naming":0,"principles":0}}`;
 
 async function analyze(name) {
   const raw = await callClaude([{
     role: "user",
-    content: `Analyze the brand "${name}". Build a profile with:
+    content: `Analyze the brand "${name}". Build a comprehensive profile with:
 - name, domain (the brand's primary website domain, e.g. "nike.com"), tagline, summary (2 sentences), personality (4-5 words)
 - colors (5-6 with name/hex/role)
 - typography (primary + secondary font names, 3 rules)
@@ -54,7 +54,15 @@ async function analyze(name) {
   - competitors: 3-4 entries, each with name, their primary brand hex color, their tone in one word, and overlap (what they share with this brand in 5-8 words)
   - whitespace: 1-2 sentences on the gap this brand owns that competitors don't
   - threats: 2 short sentences on biggest competitive risks
-- confidence (0-100 for colors/type/voice/messaging)
+- logo: description of logo type (wordmark/symbol/combination mark), likely orientations, clear space guidance, min size, approved and forbidden backgrounds, forbidden treatments (3-4 rules)
+- photography: mood description, 3-4 subject types, styling notes, 3-4 do rules, 3-4 dont rules, color treatment notes
+- naming: naming conventions (2-3), capitalization rule, 2-3 product names with types
+- channels: voice/format notes for social, email, advertising, web, print (1-2 sentences each)
+- promotion: 3-4 do rules, 3-4 dont rules, formatting guidance
+- brand_principles: mission (1 sentence), vision (1 sentence), 3-5 values, 1-2 brand archetypes
+- confidence (0-100 for colors/type/voice/messaging/logo/photography/naming/principles)
+
+Since this is a name-only analysis, set confidence for logo, photography, naming, and principles at 20-40% as these require actual brand guidelines to be authoritative. Set colors, type, voice, messaging confidence at 50-75%.
 
 Return ONLY:\n${SCHEMA}`
   }], SYS);
@@ -63,11 +71,17 @@ Return ONLY:\n${SCHEMA}`
   return r;
 }
 
-async function enrich(existing, text, label) {
-  const raw = await callClaude([{
-    role: "user",
-    content: `Existing profile for "${existing.name}":\n${JSON.stringify(existing)}\n\nNew input (${label}):\n${text.slice(0, 3000)}\n\nMerge new data. Replace inferred with authoritative. Raise confidence. Preserve and update competitive analysis if relevant. Add 1-2 "insights" noting what changed.\n\nReturn ONLY:\n${SCHEMA.slice(0, -1)},"insights":[]}`
-  }], SYS);
+async function enrich(existing, text, label, contentBlocks = null) {
+  const prompt = `Existing profile for "${existing.name}":\n${JSON.stringify(existing)}\n\nNew input (${label}):\n${text.slice(0, 6000)}\n\nMerge new data into ALL dimensions: colors, typography, voice, messaging, competitive, logo, photography, naming, channels, promotion, brand_principles. Replace inferred with authoritative. Raise confidence significantly for any dimension where the new input provides authoritative data (e.g. actual brand guidelines for logo rules should push logo confidence to 80-95%). Preserve and update competitive analysis if relevant. Add 1-2 "insights" noting what changed.\n\nReturn ONLY:\n${SCHEMA.slice(0, -1)},"insights":[]}`;
+
+  let content;
+  if (contentBlocks) {
+    content = [...contentBlocks, { type: "text", text: prompt }];
+  } else {
+    content = prompt;
+  }
+
+  const raw = await callClaude([{ role: "user", content }], SYS);
   const r = tryParse(raw);
   if (!r) throw new Error("Could not parse — try again.");
   return r;
@@ -153,21 +167,74 @@ function SourcePill({ label }) {
   </span>;
 }
 
+// ─── Sidebar ──────────────────────────────────────────────────────────────────
+
+function Sidebar({ sections, activeSection, open, onToggle, confidence }) {
+  return <>
+    {/* Mobile overlay backdrop */}
+    {open && <div onClick={onToggle} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 55, display: "none" }} className="sidebar-backdrop" />}
+    <nav style={{
+      position: "fixed", top: 56, left: 0, bottom: 0, width: 280,
+      background: "#FFF", borderRight: "1px solid #E5E5E5",
+      zIndex: 56, overflowY: "auto", padding: "32px 0",
+      transform: open ? "translateX(0)" : "translateX(-100%)",
+      transition: "transform .25s cubic-bezier(.4,0,.2,1)",
+    }} className="sidebar-nav">
+      <div style={{ padding: "0 24px 24px", ...M, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "#999" }}>Sections</div>
+      {sections.map((s, i) => {
+        const isActive = activeSection === s.id;
+        const conf = confidence?.[s.confidenceKey] || 0;
+        return <button key={s.id} onClick={() => {
+          const el = document.getElementById(s.id);
+          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+        }} style={{
+          display: "flex", alignItems: "center", gap: 14, width: "100%",
+          padding: "14px 24px", background: "none", border: "none",
+          borderLeft: isActive ? "3px solid #0D0D0D" : "3px solid transparent",
+          cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+          transition: "background .15s",
+        }}>
+          <span style={{ ...M, fontSize: 11, color: isActive ? "#0D0D0D" : "#D4D4D4", minWidth: 20 }}>{s.num}</span>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? "#0D0D0D" : "#5C5C5C", letterSpacing: "-.01em" }}>{s.title}</div>
+            {conf > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
+              <div style={{ width: 48, height: 3, background: "#F0F0F0", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${conf}%`, background: conf > 85 ? "#1A7F37" : conf > 60 ? "#0D0D0D" : "#999", borderRadius: 2 }} />
+              </div>
+              <span style={{ ...M, fontSize: 9, color: "#999" }}>{conf}%</span>
+            </div>}
+          </div>
+        </button>;
+      })}
+    </nav>
+  </>;
+}
+
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
-function Profile({ brand, sources, images, brandImages, brandLogo }) {
+function Profile({ brand, sources, images, brandImages, brandLogo, onSections }) {
   const colors = Array.isArray(brand.colors) ? brand.colors : [...(brand.colors?.primary || []), ...(brand.colors?.secondary || [])];
   const cn = brand.confidence || {};
   const primaryColor = colors[0]?.hex || "#0D0D0D";
 
   const sections = [
-    colors.length > 0 && { num: "01", title: "Color Palette" },
-    brand.typography?.primary && { num: "02", title: "Typography" },
-    (brand.voice?.words?.length > 0 || brand.voice?.do?.length > 0) && { num: "03", title: "Voice & Tone" },
-    brand.messaging?.proposition && { num: "04", title: "Messaging" },
-    (brand.competitive || brand.audience) && { num: "05", title: "Competitive Landscape" },
-    brandImages.length > 0 && { num: "06", title: "Brand Imagery" },
+    colors.length > 0 && { num: "01", id: "section-01", title: "Color System", confidenceKey: "colors" },
+    brand.typography?.primary && { num: "02", id: "section-02", title: "Typography", confidenceKey: "type" },
+    (brand.voice?.words?.length > 0 || brand.voice?.do?.length > 0) && { num: "03", id: "section-03", title: "Voice & Tone", confidenceKey: "voice" },
+    brand.messaging?.proposition && { num: "04", id: "section-04", title: "Messaging", confidenceKey: "messaging" },
+    (brand.competitive || brand.audience) && { num: "05", id: "section-05", title: "Competitive Landscape" },
+    brandImages.length > 0 && { num: "06", id: "section-06", title: "Brand Imagery" },
+    brand.logo?.description && { num: "07", id: "section-07", title: "Logo Usage", confidenceKey: "logo" },
+    brand.photography?.mood && { num: "08", id: "section-08", title: "Photography", confidenceKey: "photography" },
+    (brand.naming?.conventions?.length > 0 || brand.naming?.productNames?.length > 0) && { num: "09", id: "section-09", title: "Naming", confidenceKey: "naming" },
+    (brand.channels?.social || brand.channels?.email) && { num: "10", id: "section-10", title: "Channels" },
+    (brand.promotion?.do?.length > 0 || brand.promotion?.dont?.length > 0) && { num: "11", id: "section-11", title: "Promotion" },
+    (brand.brand_principles?.mission || brand.brand_principles?.values?.length > 0) && { num: "12", id: "section-12", title: "Brand Principles", confidenceKey: "principles" },
   ].filter(Boolean);
+
+  useEffect(() => {
+    if (onSections) onSections(sections);
+  }, [brand, brandImages.length]);
 
   return <div style={{ animation: "fadeIn .5s ease-out" }}>
 
@@ -214,7 +281,7 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
     </Spread>
 
     {/* ═══ 01 Color Palette ═══ */}
-    {colors.length > 0 && <>
+    {colors.length > 0 && <div id="section-01">
       <SectionDivider num={1} title="Color System" subtitle="Primary and secondary palette" brandName={brand.name} />
       <Spread>
         {/* Primary color hero */}
@@ -226,21 +293,19 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
           {colors.slice(0, 6).map((c, i) => <div key={i} style={{ flex: 1, height: 120, background: c.hex || "#ccc", border: (c.hex || "").toUpperCase().includes("FFF") ? "1px solid #E5E5E5" : "none" }} />)}
         </div>
         {/* Color details grid */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "32px 48px" }}>
-          {colors.slice(0, 6).map((c, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-            <div style={{ width: 28, height: 28, borderRadius: "50%", background: c.hex || "#ccc", flexShrink: 0, border: (c.hex || "").toUpperCase().includes("FFF") ? "1px solid #E5E5E5" : "none" }} />
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 2 }}>{c.name}</div>
-              <div style={{ ...M, fontSize: 12, color: "#999" }}>{c.hex}</div>
-              {c.role && <div style={{ fontSize: 12, color: "#999", marginTop: 4 }}>{c.role}</div>}
-            </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
+          {colors.slice(0, 6).map((c, i) => <div key={i}>
+            <div style={{ width: "100%", height: 80, background: c.hex || "#ccc", border: (c.hex || "").toUpperCase().includes("FFF") ? "1px solid #E5E5E5" : "none", marginBottom: 12 }} />
+            <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 2 }}>{c.name}</div>
+            <div style={{ ...M, fontSize: 11, color: "#999" }}>{c.hex}</div>
+            {c.role && <div style={{ fontSize: 12, color: "#5C5C5C", marginTop: 4 }}>{c.role}</div>}
           </div>)}
         </div>
       </Spread>
-    </>}
+    </div>}
 
     {/* ═══ 02 Typography ═══ */}
-    {brand.typography?.primary && <>
+    {brand.typography?.primary && <div id="section-02">
       <SectionDivider num={2} title="Typography System" brandName={brand.name} />
       <Spread>
         <div style={{ display: "grid", gridTemplateColumns: brand.typography.secondary && brand.typography.secondary !== "null" ? "2fr 1fr" : "1fr", gap: 64, marginBottom: 56 }}>
@@ -255,6 +320,13 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
             <div style={{ fontSize: "clamp(20px, 3vw, 28px)", fontWeight: 300, color: "#999", letterSpacing: "-.01em", lineHeight: 1.2 }}>Aa Bb Cc Dd</div>
           </div>}
         </div>
+        {/* Full alphabet specimen */}
+        <div style={{ marginBottom: 48, padding: "32px 0", borderTop: "1px solid #E5E5E5" }}>
+          <div style={{ fontSize: "clamp(20px, 3vw, 28px)", fontWeight: 300, color: "#999", letterSpacing: "-.01em", lineHeight: 1.6 }}>
+            Aa Bb Cc Dd Ee Ff Gg Hh Ii Jj Kk Ll Mm Nn Oo Pp Qq Rr Ss Tt Uu Vv Ww Xx Yy Zz
+          </div>
+          <div style={{ ...M, fontSize: 11, color: "#D4D4D4", marginTop: 8 }}>0 1 2 3 4 5 6 7 8 9 ! @ # $ % &amp; * ( )</div>
+        </div>
         {/* Weight showcase */}
         <div style={{ display: "flex", gap: 0, marginBottom: 48, borderTop: "2px solid #0D0D0D", borderBottom: "1px solid #E5E5E5" }}>
           {[{ w: 300, l: "Light" }, { w: 400, l: "Regular" }, { w: 600, l: "Semibold" }, { w: 800, l: "Bold" }].map((wt, i) => (
@@ -265,18 +337,29 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
           ))}
         </div>
         {/* Typography rules */}
-        {(brand.typography.rules || []).length > 0 && <div>
+        {(brand.typography.rules || []).length > 0 && <div style={{ marginBottom: 48 }}>
           <SectionLabel>Usage Rules</SectionLabel>
           {brand.typography.rules.map((r, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "16px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
             <span style={{ ...M, fontSize: 11, color: "#D4D4D4", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}</span>
             {r}
           </div>)}
         </div>}
+        {/* Type hierarchy example */}
+        <div>
+          <SectionLabel>Type Hierarchy</SectionLabel>
+          <div style={{ padding: "32px 0" }}>
+            <div style={{ fontSize: 48, fontWeight: 800, letterSpacing: "-.04em", lineHeight: 1.1, marginBottom: 12 }}>Heading 1</div>
+            <div style={{ fontSize: 36, fontWeight: 700, letterSpacing: "-.03em", lineHeight: 1.15, marginBottom: 12 }}>Heading 2</div>
+            <div style={{ fontSize: 24, fontWeight: 600, letterSpacing: "-.02em", lineHeight: 1.2, marginBottom: 12 }}>Heading 3</div>
+            <div style={{ fontSize: 16, fontWeight: 400, lineHeight: 1.65, marginBottom: 12, color: "#2A2A2A" }}>Body text — The quick brown fox jumps over the lazy dog. Pack my box with five dozen liquor jugs.</div>
+            <div style={{ fontSize: 12, fontWeight: 500, letterSpacing: ".02em", color: "#5C5C5C" }}>CAPTION — Supporting label text</div>
+          </div>
+        </div>
       </Spread>
-    </>}
+    </div>}
 
     {/* ═══ 03 Voice & Tone ═══ */}
-    {(brand.voice?.words?.length > 0 || brand.voice?.do?.length > 0) && <>
+    {(brand.voice?.words?.length > 0 || brand.voice?.do?.length > 0) && <div id="section-03">
       <SectionDivider num={3} title="Voice & Tone" brandName={brand.name} />
       <Spread>
         {/* Tone words — large scale 2x2 grid */}
@@ -305,10 +388,10 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
           </div>}
         </div>
       </Spread>
-    </>}
+    </div>}
 
     {/* ═══ 04 Messaging ═══ */}
-    {brand.messaging?.proposition && <>
+    {brand.messaging?.proposition && <div id="section-04">
       <SectionDivider num={4} title="Messaging Framework" brandName={brand.name} />
       {/* Core proposition — full-bleed dark hero */}
       <div style={{
@@ -332,10 +415,10 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
           {brand.messaging.forbidden.map((f, i) => <Tag key={i} red>{f}</Tag>)}
         </div>}
       </Spread>
-    </>}
+    </div>}
 
     {/* ═══ 05 Competitive Landscape ═══ */}
-    {(brand.competitive || brand.competitors?.length > 0 || brand.audience) && <>
+    {(brand.competitive || brand.competitors?.length > 0 || brand.audience) && <div id="section-05">
       <SectionDivider num={5} title="Competitive Landscape" brandName={brand.name} />
       <Spread>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64 }}>
@@ -390,10 +473,10 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
           </div>
         </div>
       </Spread>
-    </>}
+    </div>}
 
     {/* ═══ 06 Brand Imagery ═══ */}
-    {brandImages.length > 0 && <>
+    {brandImages.length > 0 && <div id="section-06">
       <SectionDivider num={6} title="Brand Imagery" brandName={brand.name} />
       <Spread noPadBottom>
         <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 4, marginBottom: 4 }}>
@@ -409,7 +492,196 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
         </div>}
         {brand.domain && <div style={{ ...M, fontSize: 10, color: "#D4D4D4", padding: "16px 0 80px" }}>Sourced from {brand.domain}</div>}
       </Spread>
-    </>}
+    </div>}
+
+    {/* ═══ 07 Logo Usage ═══ */}
+    {brand.logo?.description && <div id="section-07">
+      <SectionDivider num={7} title="Logo Usage" brandName={brand.name} />
+      <Spread>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, marginBottom: 48 }}>
+          <div>
+            <SectionLabel>Logo Description</SectionLabel>
+            <div style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em", marginBottom: 16 }}>{brand.logo.description}</div>
+            {brand.logo.clearSpace && <div style={{ marginBottom: 16 }}>
+              <SectionLabel>Clear Space</SectionLabel>
+              <div style={{ fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>{brand.logo.clearSpace}</div>
+            </div>}
+            {brand.logo.minSize && <div>
+              <SectionLabel>Minimum Size</SectionLabel>
+              <div style={{ fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>{brand.logo.minSize}</div>
+            </div>}
+          </div>
+          <div>
+            {brand.logo.orientations?.length > 0 && <div style={{ marginBottom: 24 }}>
+              <SectionLabel>Orientations</SectionLabel>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{brand.logo.orientations.map((o, i) => <Tag key={i}>{o}</Tag>)}</div>
+            </div>}
+            {brand.logo.backgrounds && <div style={{ marginBottom: 24 }}>
+              <SectionLabel>Approved Backgrounds</SectionLabel>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
+                {(brand.logo.backgrounds.approved || []).map((b, i) => <span key={i} style={{ padding: "8px 16px", fontSize: 13, background: b.toLowerCase().includes("white") ? "#FFF" : b.toLowerCase().includes("black") ? "#0D0D0D" : "#F5F5F5", color: b.toLowerCase().includes("black") ? "#FFF" : "#0D0D0D", border: "1px solid #E5E5E5" }}>{b}</span>)}
+              </div>
+              {brand.logo.backgrounds.forbidden?.length > 0 && <>
+                <SectionLabel>Forbidden Backgrounds</SectionLabel>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {brand.logo.backgrounds.forbidden.map((b, i) => <Tag key={i} red>{b}</Tag>)}
+                </div>
+              </>}
+            </div>}
+          </div>
+        </div>
+        {brand.logo.forbidden?.length > 0 && <div style={{ borderTop: "1px solid #E5E5E5", paddingTop: 32 }}>
+          <SectionLabel>Forbidden Treatments</SectionLabel>
+          {brand.logo.forbidden.map((r, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "12px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
+            <span style={{ ...M, fontSize: 11, color: "#CF222E", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}</span>
+            {r}
+          </div>)}
+        </div>}
+      </Spread>
+    </div>}
+
+    {/* ═══ 08 Photography ═══ */}
+    {brand.photography?.mood && <div id="section-08">
+      <SectionDivider num={8} title="Photography" brandName={brand.name} />
+      <Spread>
+        {/* Mood hero quote */}
+        <div style={{ padding: "48px 40px", background: "#F5F5F5", marginBottom: 48 }}>
+          <div style={{ ...M, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "#999", marginBottom: 16 }}>Mood & Direction</div>
+          <div style={{ fontSize: "clamp(20px, 3vw, 28px)", fontWeight: 300, fontStyle: "italic", letterSpacing: "-.01em", lineHeight: 1.5, color: "#2A2A2A" }}>{brand.photography.mood}</div>
+        </div>
+        {/* Subjects & Styling */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, marginBottom: 48 }}>
+          {brand.photography.subjects?.length > 0 && <div>
+            <SectionLabel>Subjects</SectionLabel>
+            {brand.photography.subjects.map((s, i) => <div key={i} style={{ padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65, borderBottom: "1px solid #E5E5E5" }}>{s}</div>)}
+          </div>}
+          <div>
+            {brand.photography.styling && <div style={{ marginBottom: 24 }}>
+              <SectionLabel>Styling</SectionLabel>
+              <div style={{ fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>{brand.photography.styling}</div>
+            </div>}
+            {brand.photography.colorTreatment && <div>
+              <SectionLabel>Color Treatment</SectionLabel>
+              <div style={{ fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>{brand.photography.colorTreatment}</div>
+            </div>}
+          </div>
+        </div>
+        {/* Do / Don't */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+          {brand.photography.do?.length > 0 && <div style={{ background: "#ECFDF3", padding: "36px 40px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#1A7F37", marginBottom: 24 }}>Do</div>
+            {brand.photography.do.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+              <span style={{ color: "#1A7F37", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>+</span><span>{v}</span>
+            </div>)}
+          </div>}
+          {brand.photography.dont?.length > 0 && <div style={{ background: "#FFF0F0", padding: "36px 40px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#CF222E", marginBottom: 24 }}>Don&apos;t</div>
+            {brand.photography.dont.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+              <span style={{ color: "#CF222E", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>&minus;</span><span>{v}</span>
+            </div>)}
+          </div>}
+        </div>
+      </Spread>
+    </div>}
+
+    {/* ═══ 09 Naming ═══ */}
+    {(brand.naming?.conventions?.length > 0 || brand.naming?.productNames?.length > 0) && <div id="section-09">
+      <SectionDivider num={9} title="Naming" brandName={brand.name} />
+      <Spread>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64 }}>
+          <div>
+            {brand.naming.conventions?.length > 0 && <div style={{ marginBottom: 32 }}>
+              <SectionLabel>Naming Conventions</SectionLabel>
+              {brand.naming.conventions.map((c, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "12px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
+                <span style={{ ...M, fontSize: 11, color: "#D4D4D4", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}</span>
+                {c}
+              </div>)}
+            </div>}
+            {brand.naming.capitalization && <div>
+              <SectionLabel>Capitalization</SectionLabel>
+              <div style={{ padding: "16px 20px", background: "#F5F5F5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>{brand.naming.capitalization}</div>
+            </div>}
+          </div>
+          {brand.naming.productNames?.length > 0 && <div>
+            <SectionLabel>Product Names</SectionLabel>
+            <div style={{ border: "1px solid #E5E5E5" }}>
+              {brand.naming.productNames.map((p, i) => <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "14px 20px", borderBottom: i < brand.naming.productNames.length - 1 ? "1px solid #E5E5E5" : "none", background: i % 2 === 0 ? "#FAFAFA" : "#FFF" }}>
+                <div style={{ fontSize: 14, fontWeight: 600 }}>{typeof p === "string" ? p : p.name}</div>
+                <div style={{ fontSize: 13, color: "#5C5C5C" }}>{typeof p === "object" ? p.type : ""}</div>
+              </div>)}
+            </div>
+          </div>}
+        </div>
+      </Spread>
+    </div>}
+
+    {/* ═══ 10 Channels ═══ */}
+    {(brand.channels?.social || brand.channels?.email) && <div id="section-10">
+      <SectionDivider num={10} title="Channels" brandName={brand.name} />
+      <Spread>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
+          {["social", "email", "advertising", "web", "print"].map(ch => brand.channels?.[ch] && <div key={ch} style={{ padding: "28px 32px", background: "#F5F5F5" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".06em", textTransform: "uppercase", color: "#0D0D0D", marginBottom: 12 }}>{ch}</div>
+            <div style={{ fontSize: 14, color: "#2A2A2A", lineHeight: 1.65 }}>{brand.channels[ch]}</div>
+          </div>)}
+        </div>
+      </Spread>
+    </div>}
+
+    {/* ═══ 11 Promotion ═══ */}
+    {(brand.promotion?.do?.length > 0 || brand.promotion?.dont?.length > 0) && <div id="section-11">
+      <SectionDivider num={11} title="Promotion" brandName={brand.name} />
+      <Spread>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: brand.promotion.formatting ? 32 : 0 }}>
+          {brand.promotion.do?.length > 0 && <div style={{ background: "#ECFDF3", padding: "36px 40px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#1A7F37", marginBottom: 24 }}>Do</div>
+            {brand.promotion.do.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+              <span style={{ color: "#1A7F37", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>+</span><span>{v}</span>
+            </div>)}
+          </div>}
+          {brand.promotion.dont?.length > 0 && <div style={{ background: "#FFF0F0", padding: "36px 40px" }}>
+            <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#CF222E", marginBottom: 24 }}>Don&apos;t</div>
+            {brand.promotion.dont.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+              <span style={{ color: "#CF222E", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>&minus;</span><span>{v}</span>
+            </div>)}
+          </div>}
+        </div>
+        {brand.promotion.formatting && <div style={{ padding: "16px 20px", background: "#F5F5F5" }}>
+          <SectionLabel>Formatting</SectionLabel>
+          <div style={{ fontSize: 15, color: "#2A2A2A", lineHeight: 1.65, marginTop: 8 }}>{brand.promotion.formatting}</div>
+        </div>}
+      </Spread>
+    </div>}
+
+    {/* ═══ 12 Brand Principles ═══ */}
+    {(brand.brand_principles?.mission || brand.brand_principles?.values?.length > 0) && <div id="section-12">
+      <SectionDivider num={12} title="Brand Principles" brandName={brand.name} />
+      {/* Mission & Vision hero */}
+      {(brand.brand_principles.mission || brand.brand_principles.vision) && <div style={{
+        minHeight: "50vh", background: "#0D0D0D", color: "#FFF",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        padding: `80px ${PAD}`, textAlign: "center",
+      }}>
+        {brand.brand_principles.mission && <>
+          <div style={{ ...M, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "#555", marginBottom: 24 }}>Mission</div>
+          <p style={{ fontSize: "clamp(24px, 4vw, 36px)", fontWeight: 300, fontStyle: "italic", lineHeight: 1.5, maxWidth: 700, letterSpacing: "-.01em", marginBottom: brand.brand_principles.vision ? 48 : 0 }}>{brand.brand_principles.mission}</p>
+        </>}
+        {brand.brand_principles.vision && <>
+          <div style={{ ...M, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "#555", marginBottom: 24 }}>Vision</div>
+          <p style={{ fontSize: "clamp(20px, 3vw, 28px)", fontWeight: 300, lineHeight: 1.5, maxWidth: 700, letterSpacing: "-.01em", color: "#999" }}>{brand.brand_principles.vision}</p>
+        </>}
+      </div>}
+      <Spread minH="auto">
+        {brand.brand_principles.values?.length > 0 && <div style={{ marginBottom: 32 }}>
+          <SectionLabel>Values</SectionLabel>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{brand.brand_principles.values.map((v, i) => <Tag key={i}>{v}</Tag>)}</div>
+        </div>}
+        {brand.brand_principles.archetypes?.length > 0 && <div>
+          <SectionLabel>Archetypes</SectionLabel>
+          <div style={{ display: "flex", gap: 24 }}>{brand.brand_principles.archetypes.map((a, i) => <div key={i} style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, letterSpacing: "-.02em", color: "#2A2A2A" }}>{a}</div>)}</div>
+        </div>}
+      </Spread>
+    </div>}
 
     {/* ═══ Insights ═══ */}
     {brand.insights?.length > 0 && <Spread minH="auto" bg="#FFF">
@@ -426,6 +698,10 @@ function Profile({ brand, sources, images, brandImages, brandLogo }) {
           <CBar label="Type" value={cn.type || cn.typography || 0} />
           <CBar label="Voice" value={cn.voice || 0} />
           <CBar label="Messaging" value={cn.messaging || 0} />
+          <CBar label="Logo" value={cn.logo || 0} />
+          <CBar label="Photography" value={cn.photography || 0} />
+          <CBar label="Naming" value={cn.naming || 0} />
+          <CBar label="Principles" value={cn.principles || 0} />
         </div>
         <div style={{ ...M, fontSize: 10, color: "#D4D4D4", marginTop: 48 }}>Generated by BrandBook</div>
       </div>
@@ -445,21 +721,68 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState([]);
   const [error, setError] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [profileSections, setProfileSections] = useState([]);
+  const [activeSection, setActiveSection] = useState(null);
+  const [pdfFile, setPdfFile] = useState(null);
   const bRef = useRef(null);
   const timerRef = useRef([]);
+  const pdfInputRef = useRef(null);
+  const imgInputRef = useRef(null);
+
+  // IntersectionObserver for active section tracking
+  useEffect(() => {
+    if (!brand || profileSections.length === 0) return;
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) setActiveSection(entry.target.id);
+      });
+    }, { rootMargin: "-20% 0px -60% 0px", threshold: 0 });
+    profileSections.forEach(s => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [brand, profileSections]);
 
   const scroll = useCallback(() => setTimeout(() => bRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 150), []);
   function clearTimers() { timerRef.current.forEach(clearTimeout); timerRef.current = []; }
   function adv(idx) { setSteps(p => p.map((s, i) => i === idx ? { ...s, done: true, active: false } : i === idx + 1 ? { ...s, active: true } : s)); }
 
-  function addImage() {
-    const labels = ["Billboard", "App UI", "Packaging", "Campaign", "Website", "Social Post"];
-    setImages(prev => [...prev, placeholderSvg(labels[prev.length % labels.length])]);
+  function handleImageUpload(e) {
+    const files = Array.from(e.target.files || []);
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = () => setImages(prev => [...prev, reader.result]);
+      reader.readAsDataURL(file);
+    });
+    e.target.value = "";
+  }
+
+  function handlePdfUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(",")[1];
+      setPdfFile({ name: file.name, base64, size: file.size });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  }
+
+  const isUrl = (s) => /^https?:\/\//i.test(s.trim());
+
+  async function scrapeUrl(url) {
+    const r = await fetch(`/api/scrape?url=${encodeURIComponent(url)}`);
+    if (!r.ok) throw new Error("Could not fetch URL");
+    const d = await r.json();
+    return d.text || "";
   }
 
   async function go() {
     const val = input.trim();
-    if (!val && !images.length) return;
+    if (!val && !images.length && !pdfFile) return;
     if (loading) return;
     setError(null); setInput(""); setLoading(true); clearTimers();
 
@@ -467,7 +790,7 @@ export default function App() {
       const hasImg = images.length > 0;
       const stepLabels = [`Identifying "${val}"…`, "Extracting visual identity"];
       if (hasImg) stepLabels.push("Analyzing uploaded images");
-      stepLabels.push("Characterizing voice & tone", "Mapping messaging");
+      stepLabels.push("Characterizing voice & tone", "Mapping messaging", "Building full brand profile");
       setSteps(stepLabels.map((l, i) => ({ label: l, active: i === 0, done: false })));
       scroll();
       for (let i = 0; i < stepLabels.length - 1; i++) timerRef.current.push(setTimeout(() => adv(i), 1400 * (i + 1)));
@@ -491,23 +814,57 @@ export default function App() {
       } finally { setLoading(false); }
 
     } else {
-      const label = images.length > 0 && !val ? "Images" : val.length > 200 ? "Guidelines" : "Context";
+      // Determine enrichment type
+      const hasPdf = !!pdfFile;
+      const hasUrl = isUrl(val);
+      const hasImages = images.length > 0;
+      const label = hasPdf ? `PDF: ${pdfFile.name}` : hasUrl ? "URL" : hasImages && !val ? "Images" : val.length > 200 ? "Guidelines" : "Context";
+
       setSources(prev => [...prev, label]);
-      setSteps([
-        { label: "Processing new input…", active: true, done: false },
+      const enrichSteps = [
+        { label: hasPdf ? `Extracting from ${pdfFile.name}…` : hasUrl ? "Scraping URL…" : "Processing new input…", active: true, done: false },
         { label: "Comparing with profile", active: false, done: false },
         { label: "Updating Brand Book", active: false, done: false },
-      ]);
+      ];
+      setSteps(enrichSteps);
       scroll();
       timerRef.current.push(setTimeout(() => adv(0), 1500));
       timerRef.current.push(setTimeout(() => adv(1), 3000));
 
       try {
-        const result = await enrich(brand, val || "(additional images provided)", label);
+        let enrichText = val || "";
+        let contentBlocks = null;
+
+        if (hasPdf) {
+          // Send PDF as document content block
+          const sizeInMB = (pdfFile.base64.length * 3 / 4) / (1024 * 1024);
+          if (sizeInMB < 4.5) {
+            contentBlocks = [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfFile.base64 } }];
+          } else {
+            enrichText = "(Large PDF uploaded — extracting key brand information)";
+            contentBlocks = [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: pdfFile.base64 } }];
+          }
+          setPdfFile(null);
+        } else if (hasUrl) {
+          enrichText = await scrapeUrl(val);
+        }
+
+        if (hasImages && images.some(img => img.startsWith("data:"))) {
+          const imgBlocks = images.filter(img => img.startsWith("data:")).map(img => {
+            const match = img.match(/^data:(image\/[^;]+);base64,(.+)/);
+            if (!match) return null;
+            return { type: "image", source: { type: "base64", media_type: match[1], data: match[2] } };
+          }).filter(Boolean);
+          contentBlocks = [...(contentBlocks || []), ...imgBlocks];
+          if (!enrichText) enrichText = "(images provided — extract brand-relevant information: colors, typography, layout patterns, photography style, logo usage)";
+        }
+
+        const result = await enrich(brand, enrichText, label, contentBlocks);
         clearTimers();
         result.name = result.name || brand.name;
         setBrand(result);
         setSteps([]);
+        setImages([]);
         scroll();
       } catch (e) {
         clearTimers(); setError(e.message); setSteps([]);
@@ -515,19 +872,37 @@ export default function App() {
     }
   }
 
-  function reset() { clearTimers(); setBrand(null); setSources([]); setImages([]); setBrandImages([]); setBrandLogo(null); setSteps([]); setError(null); setInput(""); setLoading(false); }
-  const canSend = (input.trim() || images.length > 0) && !loading;
+  function reset() { clearTimers(); setBrand(null); setSources([]); setImages([]); setBrandImages([]); setBrandLogo(null); setSteps([]); setError(null); setInput(""); setLoading(false); setSidebarOpen(false); setProfileSections([]); setActiveSection(null); setPdfFile(null); }
+  const canSend = (input.trim() || images.length > 0 || pdfFile) && !loading;
 
   return <div style={{ minHeight: "100vh", background: "#FFF", fontFamily: "'Inter Tight', system-ui, sans-serif", fontSize: 15, color: "#0D0D0D", lineHeight: 1.6 }}>
 
+    {/* Sidebar */}
+    {brand && profileSections.length > 0 && <Sidebar sections={profileSections} activeSection={activeSection} open={sidebarOpen} onToggle={() => setSidebarOpen(o => !o)} confidence={brand.confidence} />}
+
     {/* Topbar */}
     <div style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(255,255,255,.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid #E5E5E5" }}>
-      <div style={{ maxWidth: 1080, margin: "0 auto", padding: "0 clamp(24px,5vw,56px)", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+      <div style={{ padding: "0 clamp(24px,5vw,56px)", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15, fontWeight: 700, letterSpacing: "-.02em" }}>
+          {brand && <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="#0D0D0D" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          </button>}
           <svg width="22" height="22" viewBox="0 0 20 20"><rect width="20" height="20" rx="4" fill="#0D0D0D"/><rect x="3.5" y="3.5" width="5" height="5" rx="1" fill="#FFF"/><rect x="11.5" y="11.5" width="5" height="5" rx="1" fill="#FFF"/></svg>
           BrandBook
+          {brand && <span style={{ fontSize: 13, fontWeight: 400, color: "#999", marginLeft: 4 }}>{brand.name}</span>}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          {brand && (() => {
+            const cn = brand.confidence || {};
+            const vals = [cn.colors, cn.type, cn.voice, cn.messaging, cn.logo, cn.photography, cn.naming, cn.principles].filter(v => v != null && v > 0);
+            const avg = vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : 0;
+            return avg > 0 && <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <div style={{ width: 40, height: 4, background: "#F0F0F0", borderRadius: 2, overflow: "hidden" }}>
+                <div style={{ height: "100%", width: `${avg}%`, background: avg > 85 ? "#1A7F37" : avg > 60 ? "#0D0D0D" : "#999", borderRadius: 2 }} />
+              </div>
+              <span style={{ ...M, fontSize: 10, color: "#999" }}>{avg}%</span>
+            </div>;
+          })()}
           {brand && <button onClick={reset} style={{ background: "none", border: "1px solid #E5E5E5", padding: "6px 16px", borderRadius: 8, fontSize: 12, fontWeight: 500, color: "#5C5C5C", cursor: "pointer", fontFamily: "inherit" }}>New brand</button>}
           <span style={{ ...M, fontSize: 10, color: "#999", letterSpacing: ".08em", textTransform: "uppercase" }}>Prototype</span>
         </div>
@@ -549,7 +924,7 @@ export default function App() {
       </div>)}</div>}
 
       {/* Profile — full width */}
-      {brand && !loading && steps.length === 0 && <Profile brand={brand} sources={sources} images={images} brandImages={brandImages} brandLogo={brandLogo} />}
+      {brand && !loading && steps.length === 0 && <Profile brand={brand} sources={sources} images={images} brandImages={brandImages} brandLogo={brandLogo} onSections={setProfileSections} />}
 
       {/* Error */}
       {error && <div style={{ maxWidth: 640, margin: "0 auto", padding: `0 clamp(24px,5vw,56px)` }}><div style={{ padding: "14px 18px", background: "#FFF0F0", borderRadius: 10, marginBottom: 16, fontSize: 14, color: "#CF222E", fontWeight: 500 }}>{error}</div></div>}
@@ -557,23 +932,44 @@ export default function App() {
       <div ref={bRef} style={{ height: 160 }} />
     </div>
 
+    {/* Hidden file inputs */}
+    <input ref={imgInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleImageUpload} />
+    <input ref={pdfInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handlePdfUpload} />
+
     {/* Input bar */}
     <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "linear-gradient(transparent, #FFF 28px)", padding: "28px 0 24px" }}>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 clamp(24px,5vw,56px)" }}>
         <div style={{ background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: 14, boxShadow: "0 4px 24px rgba(0,0,0,.06)" }}>
-          {images.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
+          {/* Queued images + PDF chips */}
+          {(images.length > 0 || pdfFile) && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             {images.map((img, i) => <div key={i} style={{ position: "relative", width: 56, height: 56, borderRadius: 8, overflow: "hidden", border: "1px solid #E5E5E5" }}>
-              <img src={img} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              <img src={img} style={{ width: "100%", height: "100%", objectFit: "cover" }} alt="" />
               <button onClick={() => setImages(p => p.filter((_, j) => j !== i))} style={{ position: "absolute", top: -4, right: -4, width: 18, height: 18, borderRadius: "50%", background: "#0D0D0D", color: "#FFF", border: "none", fontSize: 10, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>&times;</button>
             </div>)}
+            {pdfFile && <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: "#F5F5F5", borderRadius: 8, border: "1px solid #E5E5E5" }}>
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8 1H3.5A1.5 1.5 0 002 2.5v9A1.5 1.5 0 003.5 13h7a1.5 1.5 0 001.5-1.5V5L8 1z" stroke="#CF222E" strokeWidth="1.2" /><path d="M8 1v4h4" stroke="#CF222E" strokeWidth="1.2" /></svg>
+              <span style={{ fontSize: 12, fontWeight: 500, color: "#2A2A2A", maxWidth: 120, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{pdfFile.name}</span>
+              <button onClick={() => setPdfFile(null)} style={{ background: "none", border: "none", cursor: "pointer", padding: 0, fontSize: 14, color: "#999", lineHeight: 1 }}>&times;</button>
+            </div>}
+          </div>}
+          {/* URL indicator */}
+          {isUrl(input.trim()) && <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M5 7a2.5 2.5 0 003.5 0l1-1a2.5 2.5 0 00-3.5-3.5l-.5.5" stroke="#2563EB" strokeWidth="1.2" strokeLinecap="round" /><path d="M7 5a2.5 2.5 0 00-3.5 0l-1 1a2.5 2.5 0 003.5 3.5l.5-.5" stroke="#2563EB" strokeWidth="1.2" strokeLinecap="round" /></svg>
+            <span style={{ fontSize: 11, color: "#2563EB", fontWeight: 500 }}>URL detected — will scrape for brand data</span>
           </div>}
           <div style={{ display: "flex", alignItems: "flex-end", gap: 10 }}>
-            {brand && <button onClick={addImage} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 500, color: "#5C5C5C", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" /></svg>
-              Image
-            </button>}
+            {brand && <>
+              <button onClick={() => imgInputRef.current?.click()} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 500, color: "#5C5C5C", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" /><circle cx="4" cy="4.5" r="1" fill="currentColor" /><path d="M1 9l2.5-3 2 2 1.5-1.5L11 9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                Image
+              </button>
+              <button onClick={() => pdfInputRef.current?.click()} style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: "1px solid #E5E5E5", borderRadius: 8, padding: "6px 12px", fontSize: 12, fontWeight: 500, color: "#5C5C5C", cursor: "pointer", fontFamily: "inherit", flexShrink: 0 }}>
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7 1H3a1.5 1.5 0 00-1.5 1.5v7A1.5 1.5 0 003 11h6a1.5 1.5 0 001.5-1.5V4.5L7 1z" stroke="currentColor" strokeWidth="1.2" /><path d="M7 1v3.5h3.5" stroke="currentColor" strokeWidth="1.2" /></svg>
+                PDF
+              </button>
+            </>}
             <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); go(); } }}
-              placeholder={!brand ? "Enter a company name to start…" : "Add more — paste guidelines, describe assets, add context…"}
+              placeholder={!brand ? "Enter a company name to start…" : "Paste guidelines, URLs, or context to enrich…"}
               rows={1} style={{ flex: 1, border: "none", outline: "none", resize: "none", fontSize: 15, fontFamily: "'Inter Tight',sans-serif", color: "#0D0D0D", background: "transparent", lineHeight: 1.5, minHeight: 24, maxHeight: 120, padding: "0 0 0 4px", fontWeight: 400 }} />
             <button onClick={go} disabled={!canSend} style={{
               width: 38, height: 38, borderRadius: 10, border: "none",
@@ -585,7 +981,7 @@ export default function App() {
             </button>
           </div>
         </div>
-        {brand && <div style={{ textAlign: "center", marginTop: 10 }}><span style={{ fontSize: 11, color: "#D4D4D4", fontWeight: 400 }}>Paste guidelines, add images, or add context to deepen the profile</span></div>}
+        {brand && <div style={{ textAlign: "center", marginTop: 10 }}><span style={{ fontSize: 11, color: "#D4D4D4", fontWeight: 400 }}>Upload PDFs, paste URLs or guidelines, add images to deepen the profile</span></div>}
       </div>
     </div>
   </div>;
