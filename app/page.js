@@ -78,12 +78,11 @@ async function enrich(existing, text, label) {
 // ─── Brand Image Fetching ───────────────────────────────────────────────────
 
 async function fetchBrandImages(domain) {
-  if (!domain) return [];
+  if (!domain) return { logo: null, images: [] };
   try {
     const r = await fetch(`/api/brand-images?domain=${encodeURIComponent(domain)}`);
-    const d = await r.json();
-    return d.images || [];
-  } catch { return []; }
+    return await r.json();
+  } catch { return { logo: null, images: [] }; }
 }
 
 function placeholderSvg(label, w = 240, h = 160) {
@@ -130,7 +129,7 @@ function SourcePill({ label }) {
 
 // ─── Profile ─────────────────────────────────────────────────────────────────
 
-function Profile({ brand, sources, images, brandImages }) {
+function Profile({ brand, sources, images, brandImages, brandLogo }) {
   const colors = Array.isArray(brand.colors) ? brand.colors : [...(brand.colors?.primary || []), ...(brand.colors?.secondary || [])];
   const cn = brand.confidence || {};
 
@@ -139,7 +138,7 @@ function Profile({ brand, sources, images, brandImages }) {
     <div style={{ marginBottom: 40 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-          {brand.domain && <img src={`https://www.google.com/s2/favicons?domain=${brand.domain}&sz=128`} alt="" style={{ width: 48, height: 48, borderRadius: 8, border: "1px solid #E6E4DF", objectFit: "contain", background: "#FFF" }} onError={e => { e.target.style.display = "none"; }} />}
+          {(brandLogo || brand.domain) && <img src={brandLogo || `https://www.google.com/s2/favicons?domain=${brand.domain}&sz=128`} alt="" style={{ height: 48, maxWidth: 160, borderRadius: 8, border: "1px solid #E6E4DF", objectFit: "contain", background: "#FFF", padding: 4 }} onError={e => { e.target.style.display = "none"; }} />}
           <h1 style={{ fontFamily: DF, fontSize: "clamp(36px,6vw,56px)", fontWeight: 400, letterSpacing: "-.02em", lineHeight: .95 }}>{brand.name}</h1>
         </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingTop: 8 }}>{sources.map((s, i) => <SourcePill key={i} label={s} />)}</div>
@@ -287,6 +286,7 @@ export default function App() {
   const [sources, setSources] = useState([]);
   const [images, setImages] = useState([]);
   const [brandImages, setBrandImages] = useState([]);
+  const [brandLogo, setBrandLogo] = useState(null);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState([]);
@@ -329,8 +329,11 @@ export default function App() {
         setSources(s);
         setSteps([]);
         scroll();
-        // Fetch real brand images in background
-        if (result.domain) fetchBrandImages(result.domain).then(setBrandImages);
+        // Fetch real brand images + logo in background
+        if (result.domain) fetchBrandImages(result.domain).then(d => {
+          if (d.logo) setBrandLogo(d.logo);
+          if (d.images?.length) setBrandImages(d.images);
+        });
       } catch (e) {
         clearTimers(); setError(e.message); setSteps([]);
       } finally { setLoading(false); }
@@ -361,7 +364,7 @@ export default function App() {
     }
   }
 
-  function reset() { clearTimers(); setBrand(null); setSources([]); setImages([]); setBrandImages([]); setSteps([]); setError(null); setInput(""); setLoading(false); }
+  function reset() { clearTimers(); setBrand(null); setSources([]); setImages([]); setBrandImages([]); setBrandLogo(null); setSteps([]); setError(null); setInput(""); setLoading(false); }
   const canSend = (input.trim() || images.length > 0) && !loading;
 
   return <div style={{ minHeight: "100vh", background: "#FAFAF8", fontFamily: "'DM Sans', system-ui, sans-serif", fontSize: 15, color: "#111", lineHeight: 1.6 }}>
@@ -396,7 +399,7 @@ export default function App() {
       </div>)}</div>}
 
       {/* Profile */}
-      {brand && !loading && steps.length === 0 && <Profile brand={brand} sources={sources} images={images} brandImages={brandImages} />}
+      {brand && !loading && steps.length === 0 && <Profile brand={brand} sources={sources} images={images} brandImages={brandImages} brandLogo={brandLogo} />}
 
       {/* Error */}
       {error && <div style={{ padding: "12px 16px", background: "#FFF0F0", borderRadius: 6, marginBottom: 16, fontSize: 14, color: "#CF222E" }}>{error}</div>}
