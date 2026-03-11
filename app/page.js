@@ -39,13 +39,13 @@ function tryParse(raw) {
 }
 
 const SYS = "You are BrandBook, an AI brand strategist. Return ONLY valid JSON. No markdown, no backticks, no preamble.";
-const SCHEMA = `{"name":"","tagline":"","summary":"","personality":[],"colors":[{"name":"","hex":"","role":""}],"typography":{"primary":"","secondary":"","rules":[]},"voice":{"words":[],"do":[],"dont":[]},"messaging":{"proposition":"","pillars":[{"title":"","desc":""}],"forbidden":[]},"audience":"","competitive":{"positioning":"","competitors":[{"name":"","hex":"","tone":"","overlap":""}],"whitespace":"","threats":[]},"confidence":{"colors":0,"type":0,"voice":0,"messaging":0}}`;
+const SCHEMA = `{"name":"","domain":"","tagline":"","summary":"","personality":[],"colors":[{"name":"","hex":"","role":""}],"typography":{"primary":"","secondary":"","rules":[]},"voice":{"words":[],"do":[],"dont":[]},"messaging":{"proposition":"","pillars":[{"title":"","desc":""}],"forbidden":[]},"audience":"","competitive":{"positioning":"","competitors":[{"name":"","hex":"","tone":"","overlap":""}],"whitespace":"","threats":[]},"confidence":{"colors":0,"type":0,"voice":0,"messaging":0}}`;
 
 async function analyze(name) {
   const raw = await callClaude([{
     role: "user",
     content: `Analyze the brand "${name}". Build a profile with:
-- name, tagline, summary (2 sentences), personality (4-5 words)
+- name, domain (the brand's primary website domain, e.g. "nike.com"), tagline, summary (2 sentences), personality (4-5 words)
 - colors (5-6 with name/hex/role)
 - typography (primary + secondary font names, 3 rules)
 - voice (4 tone words, 4 do, 4 dont)
@@ -75,7 +75,38 @@ async function enrich(existing, text, label) {
   return r;
 }
 
-// ─── Placeholder images ──────────────────────────────────────────────────────
+// ─── Brand Mockup Generators ────────────────────────────────────────────────
+
+function esc(s) { return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+
+function mockupBusinessCard(brand) {
+  const c = brand.colors?.[0]?.hex || "#111";
+  const c2 = brand.colors?.[1]?.hex || "#FFF";
+  const name = esc(brand.name);
+  const tag = esc(brand.tagline || "");
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="192"><rect width="320" height="192" rx="8" fill="${c}"/><rect x="20" y="20" width="40" height="40" rx="8" fill="${c2}" opacity=".2"/><text x="40" y="47" text-anchor="middle" font-family="system-ui" font-size="18" font-weight="bold" fill="${c2}">${esc(name.charAt(0))}</text><text x="20" y="100" font-family="system-ui" font-size="16" font-weight="600" fill="#FFF">${name}</text><text x="20" y="120" font-family="system-ui" font-size="10" fill="#FFF" opacity=".7">${tag.length > 45 ? tag.slice(0, 45) + "…" : tag}</text><rect x="20" y="148" width="60" height="1" fill="#FFF" opacity=".3"/><text x="20" y="168" font-family="monospace" font-size="9" fill="#FFF" opacity=".5">${esc(brand.domain || "")}</text></svg>`)}`;
+}
+
+function mockupSocialPost(brand) {
+  const c = brand.colors?.[0]?.hex || "#111";
+  const c2 = brand.colors?.[2]?.hex || brand.colors?.[1]?.hex || "#F5F5F5";
+  const name = esc(brand.name);
+  const prop = esc(brand.messaging?.proposition || brand.tagline || "");
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="320" height="320"><rect width="320" height="320" rx="8" fill="${c2}"/><rect y="0" width="320" height="6" fill="${c}"/><text x="24" y="44" font-family="system-ui" font-size="11" font-weight="600" fill="${c}">${name}</text><rect x="24" y="64" width="272" height="180" rx="6" fill="${c}"/><text x="160" y="140" text-anchor="middle" font-family="Georgia,serif" font-size="14" fill="#FFF" font-style="italic"><tspan x="160" dy="0">${prop.length > 40 ? prop.slice(0, 40) : prop}</tspan><tspan x="160" dy="18">${prop.length > 40 ? (prop.slice(40, 80) + (prop.length > 80 ? "…" : "")) : ""}</tspan></text><rect x="24" y="264" width="80" height="28" rx="14" fill="${c}" opacity=".15"/><text x="64" y="282" text-anchor="middle" font-family="system-ui" font-size="10" fill="${c}">Learn more</text></svg>`)}`;
+}
+
+function mockupLetterhead(brand) {
+  const c = brand.colors?.[0]?.hex || "#111";
+  const name = esc(brand.name);
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="240" height="310"><rect width="240" height="310" rx="4" fill="#FFF" stroke="#E6E4DF"/><rect width="240" height="48" fill="${c}"/><text x="20" y="31" font-family="system-ui" font-size="14" font-weight="600" fill="#FFF">${name}</text><rect x="20" y="68" width="160" height="4" rx="2" fill="#E6E4DF"/><rect x="20" y="82" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="94" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="106" width="180" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="118" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="130" width="140" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="150" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="162" width="200" height="3" rx="1.5" fill="#F3F2EF"/><rect x="20" y="174" width="160" height="3" rx="1.5" fill="#F3F2EF"/><rect x="0" y="290" width="240" height="20" fill="${c}" opacity=".08"/><text x="120" y="304" text-anchor="middle" font-family="monospace" font-size="7" fill="${c}" opacity=".5">${esc(brand.domain || "")}</text></svg>`)}`;
+}
+
+function mockupAppIcon(brand) {
+  const c = brand.colors?.[0]?.hex || "#111";
+  const c2 = brand.colors?.[1]?.hex || "#FFF";
+  const initial = esc((brand.name || "B").charAt(0));
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160"><rect width="160" height="160" rx="36" fill="${c}"/><text x="80" y="105" text-anchor="middle" font-family="Georgia,serif" font-size="72" font-weight="400" fill="${c2}">${initial}</text></svg>`)}`;
+}
 
 function placeholderSvg(label, w = 240, h = 160) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}"><rect width="${w}" height="${h}" fill="#EDECE8" rx="4"/><rect x="${w * .12}" y="${h * .15}" width="${w * .76}" height="${h * .4}" rx="3" fill="#DDDCD8"/><rect x="${w * .12}" y="${h * .65}" width="${w * .45}" height="${h * .06}" rx="2" fill="#DDDCD8"/><rect x="${w * .12}" y="${h * .76}" width="${w * .3}" height="${h * .06}" rx="2" fill="#DDDCD8"/><text x="${w / 2}" y="${h * .4}" text-anchor="middle" font-family="system-ui" font-size="11" fill="#A8A8A0">${label}</text></svg>`)}`;
@@ -129,7 +160,10 @@ function Profile({ brand, sources, images }) {
     {/* Header */}
     <div style={{ marginBottom: 40 }}>
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 12 }}>
-        <h1 style={{ fontFamily: DF, fontSize: "clamp(36px,6vw,56px)", fontWeight: 400, letterSpacing: "-.02em", lineHeight: .95 }}>{brand.name}</h1>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          {brand.domain && <img src={`https://logo.clearbit.com/${brand.domain}`} alt="" style={{ width: 48, height: 48, borderRadius: 8, border: "1px solid #E6E4DF", objectFit: "contain", background: "#FFF" }} onError={e => { e.target.style.display = "none"; }} />}
+          <h1 style={{ fontFamily: DF, fontSize: "clamp(36px,6vw,56px)", fontWeight: 400, letterSpacing: "-.02em", lineHeight: .95 }}>{brand.name}</h1>
+        </div>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", paddingTop: 8 }}>{sources.map((s, i) => <SourcePill key={i} label={s} />)}</div>
       </div>
       {brand.tagline && <p style={{ fontFamily: DF, fontSize: 18, fontStyle: "italic", color: "#6E6E6E", marginBottom: 8 }}>{brand.tagline}</p>}
@@ -242,6 +276,28 @@ function Profile({ brand, sources, images }) {
         </div>}
       </div>}
     </div>}
+
+    {/* Brand Applications */}
+    <div style={{ marginBottom: 48 }}><Sec num={6} label="Brand Applications" />
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+        <div>
+          <img src={mockupBusinessCard(brand)} style={{ width: "100%", borderRadius: 8, border: "1px solid #E6E4DF" }} />
+          <div style={{ ...M, fontSize: 10, color: "#A0A0A0", marginTop: 6 }}>Business Card</div>
+        </div>
+        <div>
+          <img src={mockupAppIcon(brand)} style={{ width: 96, height: 96, borderRadius: 22, border: "1px solid #E6E4DF" }} />
+          <div style={{ ...M, fontSize: 10, color: "#A0A0A0", marginTop: 6 }}>App Icon</div>
+        </div>
+        <div>
+          <img src={mockupSocialPost(brand)} style={{ width: "100%", borderRadius: 8, border: "1px solid #E6E4DF" }} />
+          <div style={{ ...M, fontSize: 10, color: "#A0A0A0", marginTop: 6 }}>Social Post</div>
+        </div>
+        <div>
+          <img src={mockupLetterhead(brand)} style={{ width: "100%", borderRadius: 8, border: "1px solid #E6E4DF" }} />
+          <div style={{ ...M, fontSize: 10, color: "#A0A0A0", marginTop: 6 }}>Letterhead</div>
+        </div>
+      </div>
+    </div>
 
     {/* Insights */}
     {brand.insights?.length > 0 && <div style={{ marginBottom: 48 }}><Sec label="Cross-source insights" />
