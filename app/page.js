@@ -172,40 +172,48 @@ function SourcePill({ label }) {
 function Sidebar({ sections, activeSection, open, onToggle, confidence }) {
   return <>
     {/* Mobile overlay backdrop */}
-    {open && <div onClick={onToggle} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 55, display: "none" }} className="sidebar-backdrop" />}
+    {open && <div onClick={onToggle} className="sidebar-backdrop" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.3)", zIndex: 55, display: "none" }} />}
     <nav style={{
-      position: "fixed", top: 56, left: 0, bottom: 0, width: 280,
+      position: "fixed", top: 56, left: 0, bottom: 0, width: 260,
       background: "#FFF", borderRight: "1px solid #E5E5E5",
-      zIndex: 56, overflowY: "auto", padding: "32px 0",
-      transform: open ? "translateX(0)" : "translateX(-100%)",
-      transition: "transform .25s cubic-bezier(.4,0,.2,1)",
+      zIndex: 40, overflowY: "auto", padding: "28px 0",
+      transform: open ? "translateX(0)" : "translateX(-260px)",
+      transition: "transform 250ms ease",
     }} className="sidebar-nav">
-      <div style={{ padding: "0 24px 24px", ...M, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "#999" }}>Sections</div>
-      {sections.map((s, i) => {
-        const isActive = activeSection === s.id;
-        const conf = confidence?.[s.confidenceKey] || 0;
-        return <button key={s.id} onClick={() => {
-          const el = document.getElementById(s.id);
-          if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-        }} style={{
-          display: "flex", alignItems: "center", gap: 14, width: "100%",
-          padding: "14px 24px", background: "none", border: "none",
-          borderLeft: isActive ? "3px solid #0D0D0D" : "3px solid transparent",
-          cursor: "pointer", fontFamily: "inherit", textAlign: "left",
-          transition: "background .15s",
-        }}>
-          <span style={{ ...M, fontSize: 11, color: isActive ? "#0D0D0D" : "#D4D4D4", minWidth: 20 }}>{s.num}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 13, fontWeight: isActive ? 600 : 400, color: isActive ? "#0D0D0D" : "#5C5C5C", letterSpacing: "-.01em" }}>{s.title}</div>
-            {conf > 0 && <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-              <div style={{ width: 48, height: 3, background: "#F0F0F0", borderRadius: 2, overflow: "hidden" }}>
-                <div style={{ height: "100%", width: `${conf}%`, background: conf > 85 ? "#1A7F37" : conf > 60 ? "#0D0D0D" : "#999", borderRadius: 2 }} />
-              </div>
-              <span style={{ ...M, fontSize: 9, color: "#999" }}>{conf}%</span>
-            </div>}
-          </div>
-        </button>;
-      })}
+      <div style={{ padding: "0 24px 20px", ...M, fontSize: 10, letterSpacing: ".12em", textTransform: "uppercase", color: "#D4D4D4" }}>Sections</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+        {sections.map((s) => {
+          const isActive = activeSection === s.id;
+          const conf = confidence?.[s.confidenceKey] || 0;
+          return <button key={s.id} onClick={() => {
+            const el = document.getElementById(s.id);
+            if (el) {
+              const y = el.getBoundingClientRect().top + window.scrollY - 72;
+              window.scrollTo({ top: y, behavior: "smooth" });
+            }
+            // Close on mobile
+            if (window.innerWidth < 768) onToggle();
+          }} style={{
+            display: "flex", alignItems: "flex-start", gap: 12, width: "100%",
+            padding: "14px 24px 14px 22px", background: "none", border: "none",
+            borderLeft: isActive ? "2px solid #0D0D0D" : "2px solid transparent",
+            cursor: "pointer", fontFamily: "inherit", textAlign: "left",
+            transition: "background .15s",
+            marginBottom: 0,
+          }}>
+            <span style={{ ...M, fontSize: 13, fontWeight: 300, color: isActive ? "#0D0D0D" : "#D4D4D4", minWidth: 22, paddingTop: 1 }}>{s.num}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: "'Inter Tight', sans-serif", fontSize: 14, fontWeight: isActive ? 600 : 400, color: isActive ? "#0D0D0D" : "#999", letterSpacing: "-.01em", lineHeight: 1.3 }}>{s.title}</div>
+              {conf > 0 && <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
+                <div style={{ width: 60, height: 2, background: "#F0F0F0", borderRadius: 1, overflow: "hidden" }}>
+                  <div style={{ height: "100%", width: `${conf}%`, background: conf > 85 ? "#1A7F37" : conf > 60 ? "#0D0D0D" : "#999", borderRadius: 1 }} />
+                </div>
+                <span style={{ ...M, fontSize: 10, color: "#999" }}>{conf}%</span>
+              </div>}
+            </div>
+          </button>;
+        })}
+      </div>
     </nav>
   </>;
 }
@@ -266,19 +274,6 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
         </div>
       )}
     </div>
-
-    {/* ═══ Table of Contents ═══ */}
-    <Spread minH="60vh" bg="#F5F5F5">
-      <h2 style={{ fontSize: "clamp(36px, 5vw, 56px)", fontWeight: 800, letterSpacing: "-.04em", marginBottom: 56 }}>Contents</h2>
-      <div>
-        {sections.map((s, i) => (
-          <div key={i} style={{ display: "flex", alignItems: "baseline", gap: 24, padding: "20px 0", borderBottom: "1px solid #E0E0E0" }}>
-            <span style={{ ...M, fontSize: "clamp(32px, 4vw, 48px)", fontWeight: 300, color: "#E0E0E0", minWidth: 80 }}>{s.num}</span>
-            <span style={{ fontSize: 20, fontWeight: 600, letterSpacing: "-.01em" }}>{s.title}</span>
-          </div>
-        ))}
-      </div>
-    </Spread>
 
     {/* ═══ 01 Color Palette ═══ */}
     {colors.length > 0 && <div id="section-01">
@@ -721,7 +716,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [steps, setSteps] = useState([]);
   const [error, setError] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [profileSections, setProfileSections] = useState([]);
   const [activeSection, setActiveSection] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
@@ -737,7 +732,7 @@ export default function App() {
       entries.forEach(entry => {
         if (entry.isIntersecting) setActiveSection(entry.target.id);
       });
-    }, { rootMargin: "-20% 0px -60% 0px", threshold: 0 });
+    }, { rootMargin: "-72px 0px -60% 0px", threshold: 0 });
     profileSections.forEach(s => {
       const el = document.getElementById(s.id);
       if (el) observer.observe(el);
@@ -872,7 +867,7 @@ export default function App() {
     }
   }
 
-  function reset() { clearTimers(); setBrand(null); setSources([]); setImages([]); setBrandImages([]); setBrandLogo(null); setSteps([]); setError(null); setInput(""); setLoading(false); setSidebarOpen(false); setProfileSections([]); setActiveSection(null); setPdfFile(null); }
+  function reset() { clearTimers(); setBrand(null); setSources([]); setImages([]); setBrandImages([]); setBrandLogo(null); setSteps([]); setError(null); setInput(""); setLoading(false); setSidebarOpen(true); setProfileSections([]); setActiveSection(null); setPdfFile(null); }
   const canSend = (input.trim() || images.length > 0 || pdfFile) && !loading;
 
   return <div style={{ minHeight: "100vh", background: "#FFF", fontFamily: "'Inter Tight', system-ui, sans-serif", fontSize: 15, color: "#0D0D0D", lineHeight: 1.6 }}>
@@ -884,8 +879,8 @@ export default function App() {
     <div style={{ position: "sticky", top: 0, zIndex: 50, background: "rgba(255,255,255,.92)", backdropFilter: "blur(12px)", borderBottom: "1px solid #E5E5E5" }}>
       <div style={{ padding: "0 clamp(24px,5vw,56px)", height: 56, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, fontSize: 15, fontWeight: 700, letterSpacing: "-.02em" }}>
-          {brand && <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4.5h14M2 9h14M2 13.5h14" stroke="#0D0D0D" strokeWidth="1.5" strokeLinecap="round" /></svg>
+          {brand && profileSections.length > 0 && <button onClick={() => setSidebarOpen(o => !o)} style={{ background: "none", border: "none", cursor: "pointer", padding: 4, display: "flex", alignItems: "center", justifyContent: "center", marginRight: 2 }} aria-label="Toggle sidebar">
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" style={{ transition: "transform 250ms ease", transform: sidebarOpen ? "rotate(0deg)" : "rotate(180deg)" }}><path d="M11 4L6 9l5 5" stroke="#0D0D0D" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>}
           <svg width="22" height="22" viewBox="0 0 20 20"><rect width="20" height="20" rx="4" fill="#0D0D0D"/><rect x="3.5" y="3.5" width="5" height="5" rx="1" fill="#FFF"/><rect x="11.5" y="11.5" width="5" height="5" rx="1" fill="#FFF"/></svg>
           BrandBook
@@ -910,7 +905,7 @@ export default function App() {
     </div>
 
     {/* Content */}
-    <div>
+    <div className="main-content" style={{ marginLeft: brand && profileSections.length > 0 && sidebarOpen ? 260 : 0, transition: "margin-left 250ms ease" }}>
       {/* Empty state — centered narrow */}
       {!brand && !loading && steps.length === 0 && <div style={{ maxWidth: 640, margin: "0 auto", padding: `18vh clamp(24px,5vw,56px) 48px` }}>
         <h1 style={{ fontSize: "clamp(40px,7vw,64px)", fontWeight: 800, lineHeight: 1.05, letterSpacing: "-.04em", marginBottom: 20 }}>Start with<br/>a name.</h1>
@@ -937,7 +932,7 @@ export default function App() {
     <input ref={pdfInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handlePdfUpload} />
 
     {/* Input bar */}
-    <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "linear-gradient(transparent, #FFF 28px)", padding: "28px 0 24px" }}>
+    <div className="input-bar-wrapper" style={{ position: "fixed", bottom: 0, left: brand && profileSections.length > 0 && sidebarOpen ? 260 : 0, right: 0, zIndex: 50, background: "linear-gradient(transparent, #FFF 28px)", padding: "28px 0 24px", transition: "left 250ms ease" }}>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 clamp(24px,5vw,56px)" }}>
         <div style={{ background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: 14, boxShadow: "0 4px 24px rgba(0,0,0,.06)" }}>
           {/* Queued images + PDF chips */}
