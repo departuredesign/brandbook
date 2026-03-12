@@ -720,7 +720,6 @@ export default function App() {
   const [profileSections, setProfileSections] = useState([]);
   const [activeSection, setActiveSection] = useState(null);
   const [pdfFile, setPdfFile] = useState(null);
-  const bRef = useRef(null);
   const timerRef = useRef([]);
   const pdfInputRef = useRef(null);
   const imgInputRef = useRef(null);
@@ -740,7 +739,7 @@ export default function App() {
     return () => observer.disconnect();
   }, [brand, profileSections]);
 
-  const scroll = useCallback(() => setTimeout(() => bRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }), 150), []);
+  const scrollToTop = useCallback(() => setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 150), []);
   function clearTimers() { timerRef.current.forEach(clearTimeout); timerRef.current = []; }
   function adv(idx) { setSteps(p => p.map((s, i) => i === idx ? { ...s, done: true, active: false } : i === idx + 1 ? { ...s, active: true } : s)); }
 
@@ -787,7 +786,7 @@ export default function App() {
       if (hasImg) stepLabels.push("Analyzing uploaded images");
       stepLabels.push("Characterizing voice & tone", "Mapping messaging", "Building full brand profile");
       setSteps(stepLabels.map((l, i) => ({ label: l, active: i === 0, done: false })));
-      scroll();
+      scrollToTop();
       for (let i = 0; i < stepLabels.length - 1; i++) timerRef.current.push(setTimeout(() => adv(i), 1400 * (i + 1)));
 
       try {
@@ -799,7 +798,7 @@ export default function App() {
         if (hasImg) s.push(`${images.length} image${images.length > 1 ? "s" : ""}`);
         setSources(s);
         setSteps([]);
-        scroll();
+        scrollToTop();
         if (result.domain) fetchBrandImages(result.domain).then(d => {
           if (d.logo) setBrandLogo(d.logo);
           if (d.images?.length) setBrandImages(d.images);
@@ -822,7 +821,7 @@ export default function App() {
         { label: "Updating Brand Book", active: false, done: false },
       ];
       setSteps(enrichSteps);
-      scroll();
+      scrollToTop();
       timerRef.current.push(setTimeout(() => adv(0), 1500));
       timerRef.current.push(setTimeout(() => adv(1), 3000));
 
@@ -860,7 +859,7 @@ export default function App() {
         setBrand(result);
         setSteps([]);
         setImages([]);
-        scroll();
+        scrollToTop();
       } catch (e) {
         clearTimers(); setError(e.message); setSteps([]);
       } finally { setLoading(false); }
@@ -924,7 +923,7 @@ export default function App() {
       {/* Error */}
       {error && <div style={{ maxWidth: 640, margin: "0 auto", padding: `0 clamp(24px,5vw,56px)` }}><div style={{ padding: "14px 18px", background: "#FFF0F0", borderRadius: 10, marginBottom: 16, fontSize: 14, color: "#CF222E", fontWeight: 500 }}>{error}</div></div>}
 
-      <div ref={bRef} style={{ height: 160 }} />
+      <div style={{ height: 120 }} />
     </div>
 
     {/* Hidden file inputs */}
@@ -932,9 +931,9 @@ export default function App() {
     <input ref={pdfInputRef} type="file" accept=".pdf" style={{ display: "none" }} onChange={handlePdfUpload} />
 
     {/* Input bar */}
-    <div className="input-bar-wrapper" style={{ position: "fixed", bottom: 0, left: brand && profileSections.length > 0 && sidebarOpen ? 260 : 0, right: 0, zIndex: 50, background: "linear-gradient(transparent, #FFF 28px)", padding: "28px 0 24px", transition: "left 250ms ease" }}>
+    <div className="input-bar-wrapper" style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "#FFF", borderTop: "1px solid #E5E5E5", boxShadow: "0 -2px 12px rgba(0,0,0,.04)", padding: "16px 0", marginLeft: brand && profileSections.length > 0 && sidebarOpen ? 260 : 0, transition: "margin-left 250ms ease" }}>
       <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 clamp(24px,5vw,56px)" }}>
-        <div style={{ background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: 14, boxShadow: "0 4px 24px rgba(0,0,0,.06)" }}>
+        <div style={{ background: "#FFF", border: "1px solid #E5E5E5", borderRadius: 14, padding: "16px 20px", boxShadow: "0 2px 8px rgba(0,0,0,.03)" }}>
           {/* Queued images + PDF chips */}
           {(images.length > 0 || pdfFile) && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 10 }}>
             {images.map((img, i) => <div key={i} style={{ position: "relative", width: 56, height: 56, borderRadius: 8, overflow: "hidden", border: "1px solid #E5E5E5" }}>
@@ -976,7 +975,7 @@ export default function App() {
             </button>
           </div>
         </div>
-        {brand && <div style={{ textAlign: "center", marginTop: 10 }}><span style={{ fontSize: 11, color: "#D4D4D4", fontWeight: 400 }}>Upload PDFs, paste URLs or guidelines, add images to deepen the profile</span></div>}
+        {brand && <div style={{ textAlign: "center", marginTop: 8 }}><span style={{ fontSize: 11, color: "#D4D4D4", fontWeight: 400 }}>Upload PDFs, paste URLs or guidelines, add images to deepen the profile</span></div>}
       </div>
     </div>
   </div>;
