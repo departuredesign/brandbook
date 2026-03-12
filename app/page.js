@@ -224,6 +224,7 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
   const colors = Array.isArray(brand.colors) ? brand.colors : [...(brand.colors?.primary || []), ...(brand.colors?.secondary || [])];
   const cn = brand.confidence || {};
   const primaryColor = colors[0]?.hex || "#0D0D0D";
+  const arr = v => Array.isArray(v) ? v : v ? [v] : [];
 
   const sections = [
     colors.length > 0 && { num: "01", id: "section-01", title: "Color System", confidenceKey: "colors" },
@@ -261,7 +262,7 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
         {brand.tagline && <p style={{ fontSize: 20, fontStyle: "italic", color: "#5C5C5C", marginBottom: 24 }}>{brand.tagline}</p>}
         {brand.summary && <p style={{ fontSize: 16, color: "#2A2A2A", lineHeight: 1.7, maxWidth: 520 }}>{brand.summary}</p>}
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 32 }}>{sources.map((s, i) => <SourcePill key={i} label={s} />)}</div>
-        {brand.personality?.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 20 }}>{brand.personality.map((p, i) => <Tag key={i}>{p}</Tag>)}</div>}
+        {arr(brand.personality).length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 20 }}>{arr(brand.personality).map((p, i) => <Tag key={i}>{p}</Tag>)}</div>}
         {images.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 20 }}>{images.map((img, i) => <img key={i} src={img} style={{ width: 100, height: 68, objectFit: "cover", borderRadius: 6, border: "1px solid #E5E5E5" }} />)}</div>}
       </div>
       {brandImages.length > 0 ? (
@@ -334,7 +335,7 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
         {/* Typography rules */}
         {(brand.typography.rules || []).length > 0 && <div style={{ marginBottom: 48 }}>
           <SectionLabel>Usage Rules</SectionLabel>
-          {brand.typography.rules.map((r, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "16px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
+          {arr(brand.typography.rules).map((r, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "16px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
             <span style={{ ...M, fontSize: 11, color: "#D4D4D4", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}</span>
             {r}
           </div>)}
@@ -358,8 +359,8 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
       <SectionDivider num={3} title="Voice & Tone" brandName={brand.name} />
       <Spread>
         {/* Tone words — large scale 2x2 grid */}
-        {brand.voice.words?.length > 0 && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginBottom: 56 }}>
-          {brand.voice.words.map((w, i) => <div key={i} style={{
+        {arr(brand.voice.words).length > 0 && <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 0, marginBottom: 56 }}>
+          {arr(brand.voice.words).map((w, i) => <div key={i} style={{
             padding: "48px 40px",
             background: i % 2 === 0 ? "#F5F5F5" : "#EBEBEB",
             borderBottom: i < 2 ? "none" : "none",
@@ -369,15 +370,15 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
         </div>}
         {/* Do / Don't */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-          {brand.voice.do?.length > 0 && <div style={{ background: "#ECFDF3", padding: "36px 40px", minHeight: 300 }}>
+          {arr(brand.voice.do).length > 0 && <div style={{ background: "#ECFDF3", padding: "36px 40px", minHeight: 300 }}>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#1A7F37", marginBottom: 24 }}>The brand does</div>
-            {brand.voice.do.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+            {arr(brand.voice.do).map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
               <span style={{ color: "#1A7F37", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>+</span><span>{v}</span>
             </div>)}
           </div>}
-          {brand.voice.dont?.length > 0 && <div style={{ background: "#FFF0F0", padding: "36px 40px", minHeight: 300 }}>
+          {arr(brand.voice.dont).length > 0 && <div style={{ background: "#FFF0F0", padding: "36px 40px", minHeight: 300 }}>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#CF222E", marginBottom: 24 }}>The brand avoids</div>
-            {brand.voice.dont.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+            {arr(brand.voice.dont).map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
               <span style={{ color: "#CF222E", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>&minus;</span><span>{v}</span>
             </div>)}
           </div>}
@@ -399,15 +400,15 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
       </div>
       {/* Pillars + Forbidden */}
       <Spread minH="auto" bg="#FFF">
-        {brand.messaging.pillars?.length > 0 && <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(brand.messaging.pillars.length, 3)}, 1fr)`, gap: 32, marginBottom: 40 }}>
-          {brand.messaging.pillars.map((p, i) => <div key={i} style={{ borderLeft: "3px solid #0D0D0D", paddingLeft: 24 }}>
+        {arr(brand.messaging.pillars).length > 0 && <div style={{ display: "grid", gridTemplateColumns: `repeat(${Math.min(arr(brand.messaging.pillars).length, 3)}, 1fr)`, gap: 32, marginBottom: 40 }}>
+          {arr(brand.messaging.pillars).map((p, i) => <div key={i} style={{ borderLeft: "3px solid #0D0D0D", paddingLeft: 24 }}>
             <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 8, letterSpacing: "-.01em" }}>{typeof p === "string" ? p : p.title || ""}</div>
             {typeof p === "object" && p.desc && <div style={{ fontSize: 14, color: "#5C5C5C", lineHeight: 1.65 }}>{p.desc}</div>}
           </div>)}
         </div>}
-        {brand.messaging.forbidden?.length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", paddingTop: 24, borderTop: "1px solid #E5E5E5" }}>
+        {arr(brand.messaging.forbidden).length > 0 && <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", paddingTop: 24, borderTop: "1px solid #E5E5E5" }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: "#CF222E", letterSpacing: ".06em", textTransform: "uppercase", marginRight: 8 }}>Never say</span>
-          {brand.messaging.forbidden.map((f, i) => <Tag key={i} red>{f}</Tag>)}
+          {arr(brand.messaging.forbidden).map((f, i) => <Tag key={i} red>{f}</Tag>)}
         </div>}
       </Spread>
     </div>}
@@ -431,9 +432,9 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#1A7F37", marginBottom: 8 }}>Whitespace owned</div>
               <div style={{ fontSize: 14, color: "#2A2A2A", lineHeight: 1.65 }}>{brand.competitive.whitespace}</div>
             </div>}
-            {brand.competitive?.threats?.length > 0 && <div style={{ padding: "24px 28px", background: "#FFF8E1" }}>
+            {brand.competitive?.threats && <div style={{ padding: "24px 28px", background: "#FFF8E1" }}>
               <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#9A6700", marginBottom: 8 }}>Competitive risks</div>
-              {brand.competitive.threats.map((t, i) => <div key={i} style={{ fontSize: 14, color: "#2A2A2A", lineHeight: 1.65, marginBottom: 4 }}>{t}</div>)}
+              {(Array.isArray(brand.competitive.threats) ? brand.competitive.threats : [brand.competitive.threats]).map((t, i) => <div key={i} style={{ fontSize: 14, color: "#2A2A2A", lineHeight: 1.65, marginBottom: 4 }}>{t}</div>)}
             </div>}
           </div>
 
@@ -507,27 +508,27 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
             </div>}
           </div>
           <div>
-            {brand.logo.orientations?.length > 0 && <div style={{ marginBottom: 24 }}>
+            {arr(brand.logo.orientations).length > 0 && <div style={{ marginBottom: 24 }}>
               <SectionLabel>Orientations</SectionLabel>
-              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{brand.logo.orientations.map((o, i) => <Tag key={i}>{o}</Tag>)}</div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{arr(brand.logo.orientations).map((o, i) => <Tag key={i}>{o}</Tag>)}</div>
             </div>}
             {brand.logo.backgrounds && <div style={{ marginBottom: 24 }}>
               <SectionLabel>Approved Backgrounds</SectionLabel>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 12 }}>
-                {(brand.logo.backgrounds.approved || []).map((b, i) => <span key={i} style={{ padding: "8px 16px", fontSize: 13, background: b.toLowerCase().includes("white") ? "#FFF" : b.toLowerCase().includes("black") ? "#0D0D0D" : "#F5F5F5", color: b.toLowerCase().includes("black") ? "#FFF" : "#0D0D0D", border: "1px solid #E5E5E5" }}>{b}</span>)}
+                {arr(brand.logo.backgrounds.approved).map((b, i) => <span key={i} style={{ padding: "8px 16px", fontSize: 13, background: b.toLowerCase().includes("white") ? "#FFF" : b.toLowerCase().includes("black") ? "#0D0D0D" : "#F5F5F5", color: b.toLowerCase().includes("black") ? "#FFF" : "#0D0D0D", border: "1px solid #E5E5E5" }}>{b}</span>)}
               </div>
-              {brand.logo.backgrounds.forbidden?.length > 0 && <>
+              {arr(brand.logo.backgrounds.forbidden).length > 0 && <>
                 <SectionLabel>Forbidden Backgrounds</SectionLabel>
                 <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                  {brand.logo.backgrounds.forbidden.map((b, i) => <Tag key={i} red>{b}</Tag>)}
+                  {arr(brand.logo.backgrounds.forbidden).map((b, i) => <Tag key={i} red>{b}</Tag>)}
                 </div>
               </>}
             </div>}
           </div>
         </div>
-        {brand.logo.forbidden?.length > 0 && <div style={{ borderTop: "1px solid #E5E5E5", paddingTop: 32 }}>
+        {arr(brand.logo.forbidden).length > 0 && <div style={{ borderTop: "1px solid #E5E5E5", paddingTop: 32 }}>
           <SectionLabel>Forbidden Treatments</SectionLabel>
-          {brand.logo.forbidden.map((r, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "12px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
+          {arr(brand.logo.forbidden).map((r, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "12px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
             <span style={{ ...M, fontSize: 11, color: "#CF222E", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}</span>
             {r}
           </div>)}
@@ -546,9 +547,9 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
         </div>
         {/* Subjects & Styling */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 48, marginBottom: 48 }}>
-          {brand.photography.subjects?.length > 0 && <div>
+          {arr(brand.photography.subjects).length > 0 && <div>
             <SectionLabel>Subjects</SectionLabel>
-            {brand.photography.subjects.map((s, i) => <div key={i} style={{ padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65, borderBottom: "1px solid #E5E5E5" }}>{s}</div>)}
+            {arr(brand.photography.subjects).map((s, i) => <div key={i} style={{ padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65, borderBottom: "1px solid #E5E5E5" }}>{s}</div>)}
           </div>}
           <div>
             {brand.photography.styling && <div style={{ marginBottom: 24 }}>
@@ -563,15 +564,15 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
         </div>
         {/* Do / Don't */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-          {brand.photography.do?.length > 0 && <div style={{ background: "#ECFDF3", padding: "36px 40px" }}>
+          {arr(brand.photography.do).length > 0 && <div style={{ background: "#ECFDF3", padding: "36px 40px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#1A7F37", marginBottom: 24 }}>Do</div>
-            {brand.photography.do.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+            {arr(brand.photography.do).map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
               <span style={{ color: "#1A7F37", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>+</span><span>{v}</span>
             </div>)}
           </div>}
-          {brand.photography.dont?.length > 0 && <div style={{ background: "#FFF0F0", padding: "36px 40px" }}>
+          {arr(brand.photography.dont).length > 0 && <div style={{ background: "#FFF0F0", padding: "36px 40px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#CF222E", marginBottom: 24 }}>Don&apos;t</div>
-            {brand.photography.dont.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+            {arr(brand.photography.dont).map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
               <span style={{ color: "#CF222E", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>&minus;</span><span>{v}</span>
             </div>)}
           </div>}
@@ -585,9 +586,9 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
       <Spread>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64 }}>
           <div>
-            {brand.naming.conventions?.length > 0 && <div style={{ marginBottom: 32 }}>
+            {arr(brand.naming.conventions).length > 0 && <div style={{ marginBottom: 32 }}>
               <SectionLabel>Naming Conventions</SectionLabel>
-              {brand.naming.conventions.map((c, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "12px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
+              {arr(brand.naming.conventions).map((c, i) => <div key={i} style={{ display: "flex", gap: 16, alignItems: "baseline", padding: "12px 0", borderBottom: "1px solid #E5E5E5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>
                 <span style={{ ...M, fontSize: 11, color: "#D4D4D4", flexShrink: 0 }}>{String(i + 1).padStart(2, "0")}</span>
                 {c}
               </div>)}
@@ -597,10 +598,10 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
               <div style={{ padding: "16px 20px", background: "#F5F5F5", fontSize: 15, color: "#2A2A2A", lineHeight: 1.65 }}>{brand.naming.capitalization}</div>
             </div>}
           </div>
-          {brand.naming.productNames?.length > 0 && <div>
+          {arr(brand.naming.productNames).length > 0 && <div>
             <SectionLabel>Product Names</SectionLabel>
             <div style={{ border: "1px solid #E5E5E5" }}>
-              {brand.naming.productNames.map((p, i) => <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "14px 20px", borderBottom: i < brand.naming.productNames.length - 1 ? "1px solid #E5E5E5" : "none", background: i % 2 === 0 ? "#FAFAFA" : "#FFF" }}>
+              {arr(brand.naming.productNames).map((p, i) => <div key={i} style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: "14px 20px", borderBottom: i < arr(brand.naming.productNames).length - 1 ? "1px solid #E5E5E5" : "none", background: i % 2 === 0 ? "#FAFAFA" : "#FFF" }}>
                 <div style={{ fontSize: 14, fontWeight: 600 }}>{typeof p === "string" ? p : p.name}</div>
                 <div style={{ fontSize: 13, color: "#5C5C5C" }}>{typeof p === "object" ? p.type : ""}</div>
               </div>)}
@@ -628,15 +629,15 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
       <SectionDivider num={11} title="Promotion" brandName={brand.name} />
       <Spread>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24, marginBottom: brand.promotion.formatting ? 32 : 0 }}>
-          {brand.promotion.do?.length > 0 && <div style={{ background: "#ECFDF3", padding: "36px 40px" }}>
+          {arr(brand.promotion.do).length > 0 && <div style={{ background: "#ECFDF3", padding: "36px 40px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#1A7F37", marginBottom: 24 }}>Do</div>
-            {brand.promotion.do.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+            {arr(brand.promotion.do).map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
               <span style={{ color: "#1A7F37", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>+</span><span>{v}</span>
             </div>)}
           </div>}
-          {brand.promotion.dont?.length > 0 && <div style={{ background: "#FFF0F0", padding: "36px 40px" }}>
+          {arr(brand.promotion.dont).length > 0 && <div style={{ background: "#FFF0F0", padding: "36px 40px" }}>
             <div style={{ fontSize: 13, fontWeight: 700, letterSpacing: ".08em", textTransform: "uppercase", color: "#CF222E", marginBottom: 24 }}>Don&apos;t</div>
-            {brand.promotion.dont.map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
+            {arr(brand.promotion.dont).map((v, i) => <div key={i} style={{ display: "flex", gap: 12, padding: "10px 0", fontSize: 15, color: "#2A2A2A", lineHeight: 1.6 }}>
               <span style={{ color: "#CF222E", fontWeight: 700, flexShrink: 0, fontSize: 16 }}>&minus;</span><span>{v}</span>
             </div>)}
           </div>}
@@ -667,21 +668,21 @@ function Profile({ brand, sources, images, brandImages, brandLogo, onSections })
         </>}
       </div>}
       <Spread minH="auto">
-        {brand.brand_principles.values?.length > 0 && <div style={{ marginBottom: 32 }}>
+        {arr(brand.brand_principles.values).length > 0 && <div style={{ marginBottom: 32 }}>
           <SectionLabel>Values</SectionLabel>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{brand.brand_principles.values.map((v, i) => <Tag key={i}>{v}</Tag>)}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>{arr(brand.brand_principles.values).map((v, i) => <Tag key={i}>{v}</Tag>)}</div>
         </div>}
-        {brand.brand_principles.archetypes?.length > 0 && <div>
+        {arr(brand.brand_principles.archetypes).length > 0 && <div>
           <SectionLabel>Archetypes</SectionLabel>
-          <div style={{ display: "flex", gap: 24 }}>{brand.brand_principles.archetypes.map((a, i) => <div key={i} style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, letterSpacing: "-.02em", color: "#2A2A2A" }}>{a}</div>)}</div>
+          <div style={{ display: "flex", gap: 24 }}>{arr(brand.brand_principles.archetypes).map((a, i) => <div key={i} style={{ fontSize: "clamp(28px, 4vw, 40px)", fontWeight: 700, letterSpacing: "-.02em", color: "#2A2A2A" }}>{a}</div>)}</div>
         </div>}
       </Spread>
     </div>}
 
     {/* ═══ Insights ═══ */}
-    {brand.insights?.length > 0 && <Spread minH="auto" bg="#FFF">
+    {arr(brand.insights).length > 0 && <Spread minH="auto" bg="#FFF">
       <SectionLabel>Cross-source insights</SectionLabel>
-      {brand.insights.map((ins, i) => <div key={i} style={{ padding: "16px 24px", background: "#EFF6FF", marginBottom: 8, fontSize: 14, color: "#2A2A2A", lineHeight: 1.65, borderLeft: "3px solid #2563EB" }}>{ins}</div>)}
+      {arr(brand.insights).map((ins, i) => <div key={i} style={{ padding: "16px 24px", background: "#EFF6FF", marginBottom: 8, fontSize: 14, color: "#2A2A2A", lineHeight: 1.65, borderLeft: "3px solid #2563EB" }}>{ins}</div>)}
     </Spread>}
 
     {/* ═══ Confidence ═══ */}
